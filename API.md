@@ -8,8 +8,7 @@ Este guia é para quem vai **consumir** a API (um front-end, um app, um parceiro
 |---|---|
 | **URL base** | `http://localhost:8000` (ambiente local; troque pelo endereço do servidor onde a API estiver publicada) |
 | **Formato das respostas** | JSON (`Content-Type: application/json`) |
-| **Formato do envio (POST)** | `application/x-www-form-urlencoded` ou `multipart/form-data`. **JSON no corpo ainda não é aceito.** |
-| **Formato do envio (PUT)** | Só `application/x-www-form-urlencoded` (o padrão do `curl -d`). `multipart/form-data` e JSON não são aceitos. |
+| **Formato do envio (POST e PUT)** | JSON (`Content-Type: application/json`). Form (`x-www-form-urlencoded` / `multipart/form-data`) não é aceito. |
 | **Autenticação** | Nenhuma |
 
 ### Endpoints
@@ -26,6 +25,18 @@ Este guia é para quem vai **consumir** a API (um front-end, um app, um parceiro
 | `PUT` | `/bosses/{id}` | Edita um chefe |
 
 Não existe rota para listar todos os registros, nem para apagar. Só workers e bosses podem ser editados; tasks ainda não.
+
+### Enviando JSON
+
+Mande o header `Content-Type: application/json` e um objeto JSON no corpo. Os campos são os mesmos do form.
+
+```
+curl -X POST http://localhost:8000/workers \
+  -H "Content-Type: application/json" \
+  -d '{"name": "Maria Oliveira", "email": "maria.oliveira@example.com"}'
+```
+
+Ids podem ir como número ou texto (`"boss_id": 1` ou `"boss_id": "1"`). Se o corpo estiver vazio ou não for um objeto JSON válido (JSON quebrado, um texto solto, um número), a resposta é `400 {"error": "Invalid JSON body"}`.
 
 ### Formato dos erros
 
@@ -103,18 +114,16 @@ Toda task nova começa com status `pending`.
 
 ```
 curl -X POST http://localhost:8000/tasks \
-  -d "title=Revisar contrato" \
-  -d "description=Conferir as cláusulas novas" \
-  -d "boss_id=1" \
-  -d "worker_id=2"
+  -H "Content-Type: application/json" \
+  -d '{"title": "Revisar contrato", "description": "Conferir as cláusulas novas", "boss_id": 1, "worker_id": 2}'
 ```
 
 **Exemplo sem funcionário**
 
 ```
 curl -X POST http://localhost:8000/tasks \
-  -d "title=Planejar sprint" \
-  -d "boss_id=1"
+  -H "Content-Type: application/json" \
+  -d '{"title": "Planejar sprint", "boss_id": 1}'
 ```
 
 **Resposta `201 Created`**
@@ -198,7 +207,9 @@ Espaços no começo e no fim de `name` e `email` são removidos antes de gravar.
 **Exemplo**
 
 ```
-curl -X POST http://localhost:8000/workers   -d "name=Maria Oliveira"   -d "email=maria.oliveira@example.com"
+curl -X POST http://localhost:8000/workers \
+  -H "Content-Type: application/json" \
+  -d '{"name": "Maria Oliveira", "email": "maria.oliveira@example.com"}'
 ```
 
 **Resposta `201 Created`**
@@ -233,12 +244,14 @@ Se `name` e `email` estiverem errados ao mesmo tempo, só o erro do `name` é de
 
 O `PUT` substitui os dados do funcionário: envie **sempre `name` e `email`**, mesmo que só um deles mude. As regras são as mesmas do `POST /workers` (tamanhos, email válido, espaços removidos, email em minúsculo). O `id` e o `created` não mudam.
 
-O corpo precisa ser `application/x-www-form-urlencoded` (é o que o `curl -d` envia).
+O corpo precisa ser JSON (veja [Enviando JSON](#enviando-json)).
 
 **Exemplo**
 
 ```
-curl -X PUT http://localhost:8000/workers/1   -d "name=Ana Silva Souza"   -d "email=ana.silva@example.com"
+curl -X PUT http://localhost:8000/workers/1 \
+  -H "Content-Type: application/json" \
+  -d '{"name": "Ana Silva Souza", "email": "ana.silva@example.com"}'
 ```
 
 **Resposta `200 OK`**
@@ -306,7 +319,9 @@ Funciona igual ao `POST /workers`: mesmos campos (`name` até 100 caracteres, `e
 **Exemplo**
 
 ```
-curl -X POST http://localhost:8000/bosses   -d "name=Chefe Teste"   -d "email=chefe.teste@example.com"
+curl -X POST http://localhost:8000/bosses \
+  -H "Content-Type: application/json" \
+  -d '{"name": "Chefe Teste", "email": "chefe.teste@example.com"}'
 ```
 
 **Resposta `201 Created`**
@@ -331,7 +346,9 @@ Funciona igual ao `PUT /workers/{id}`: envie sempre `name` e `email`, com as mes
 **Exemplo**
 
 ```
-curl -X PUT http://localhost:8000/bosses/1   -d "name=Fernando Alves"   -d "email=fernando.alves@example.com"
+curl -X PUT http://localhost:8000/bosses/1 \
+  -H "Content-Type: application/json" \
+  -d '{"name": "Fernando Alves", "email": "fernando.alves@example.com"}'
 ```
 
 ---
@@ -360,8 +377,7 @@ Valem para qualquer chamada:
 
 ## Limitações atuais
 
-- O corpo do `POST` precisa ser form-data ou x-www-form-urlencoded. JSON ainda não é aceito.
 - Um `title` com mais de 150 caracteres devolve `500 Database error` em vez de `400`.
 - Um id muito grande (acima de 2147483647), em `GET /tasks/{id}`, `GET /workers/{id}`, `GET /bosses/{id}` em `PUT /workers/{id}`, `PUT /bosses/{id}` ou no `boss_id`/`worker_id` de `POST /tasks`, devolve `500 Database error` em vez de `400`.
-- O corpo do `PUT` precisa ser x-www-form-urlencoded. form-data (multipart) e JSON chegam vazios e devolvem `400 The name is required`.
+- O corpo precisa ser JSON. Form (x-www-form-urlencoded ou multipart) devolve `400 Invalid JSON body`.
 - Ainda não há rotas para listar ou apagar registros, nem para editar tasks.

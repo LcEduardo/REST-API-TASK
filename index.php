@@ -32,9 +32,15 @@ function routeId(array $segments): ?string {
     return ($id === null || $id === '') ? null : $id;
 }
 
-// O PHP só preenche $_POST no POST. No PUT o corpo (x-www-form-urlencoded) é lido direto de php://input.
-function requestBody(): array {
-    parse_str(file_get_contents('php://input'), $body);
+// Corpo da requisição em JSON. Se for inválido (ou não for um objeto), já responde 400 e devolve null.
+function requestBody(): ?array {
+    $body = json_decode(file_get_contents('php://input'), true);
+
+    if (json_last_error() !== JSON_ERROR_NONE || !is_array($body)) {
+        respond(400, ['error' => 'Invalid JSON body']);
+        return null;
+    }
+
     return $body;
 }
 
@@ -79,9 +85,12 @@ switch ($url) {
         respond($response['status'], $response['body']);
         break;
     case 'POST tasks':
-        $workerId = $_POST['worker_id'] ?? null;
-        $bossId = $_POST['boss_id'] ?? null;
-        $title = $_POST['title'] ?? null;
+        $body = requestBody();
+        if ($body === null) break;
+
+        $workerId = $body['worker_id'] ?? null;
+        $bossId = $body['boss_id'] ?? null;
+        $title = $body['title'] ?? null;
 
         $worker = $controllerWorker->getWorker($workerId); // body null se o worker_id não foi enviado
         $boss = $controllerBoss->getBoss($bossId); // sempre retornar um array
@@ -94,15 +103,21 @@ switch ($url) {
             break;
         }
 
-        $response = $controllerTask->createTask($worker['body'], $boss['body'], $_POST['description'] ?? null, $title);
+        $response = $controllerTask->createTask($worker['body'], $boss['body'], $body['description'] ?? null, $title);
         respond($response['status'], $response['body']);
         break;
     case 'POST workers':
-        $response = $controllerWorker->createWorker($_POST['name'] ?? null, $_POST['email'] ?? null);
+        $body = requestBody();
+        if ($body === null) break;
+
+        $response = $controllerWorker->createWorker($body['name'] ?? null, $body['email'] ?? null);
         respond($response['status'], $response['body']);
         break;
     case 'POST bosses':
-        $response = $controllerBoss->createBoss($_POST['name'] ?? null, $_POST['email'] ?? null);
+        $body = requestBody();
+        if ($body === null) break;
+
+        $response = $controllerBoss->createBoss($body['name'] ?? null, $body['email'] ?? null);
         respond($response['status'], $response['body']);
         break;
     case 'PUT workers':
@@ -113,6 +128,8 @@ switch ($url) {
         }
 
         $body = requestBody();
+        if ($body === null) break;
+
         $response = $controllerWorker->updateWorker($id, $body['name'] ?? null, $body['email'] ?? null);
         respond($response['status'], $response['body']);
         break;
@@ -124,6 +141,8 @@ switch ($url) {
         }
 
         $body = requestBody();
+        if ($body === null) break;
+
         $response = $controllerBoss->updateBoss($id, $body['name'] ?? null, $body['email'] ?? null);
         respond($response['status'], $response['body']);
         break;
