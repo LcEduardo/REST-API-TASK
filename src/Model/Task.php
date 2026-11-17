@@ -29,4 +29,16 @@ class Task extends Model{
         return $task;
 
     }
+
+    // Mesmo formato do getById (worker e boss pelo nome), ordenado por id para a lista ser estável
+    public function getAll(): array {
+        $stmt = $this->conn->query(
+            "SELECT t.id, t.title, t.description, t.status, t.created, t.modified, w.name as \"worker\", b.name as \"boss\" FROM tasks t
+                LEFT JOIN workers w on w.id = t.worker_id
+                LEFT JOIN bosses b on b.id = t.boss_id
+             ORDER BY t.id;"
+        );
+
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
 }

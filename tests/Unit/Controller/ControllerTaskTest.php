@@ -42,4 +42,43 @@ final class ControllerTaskTest extends TestCase
         $this->assertSame(200, $response['status']);
         $this->assertSame($row, $response['body']);
     }
+
+    public function testGetAllTasksReturns200WithAllTasks(): void
+    {
+        $rows = [
+            ['id' => 1, 'title' => 'Tarefa 1'],
+            ['id' => 2, 'title' => 'Tarefa 2'],
+        ];
+
+        $task = $this->createStub(Task::class);
+        $task->method('getAll')->willReturn($rows);
+
+        $response = (new ControllerTask($task))->getAllTasks();
+
+        $this->assertSame(200, $response['status']);
+        $this->assertSame($rows, $response['body']);
+    }
+
+    public function testGetAllTasksReturns200WithEmptyArrayWhenThereAreNoTasks(): void
+    {
+        // lista vazia não é 404: a coleção existe, só não tem itens
+        $task = $this->createStub(Task::class);
+        $task->method('getAll')->willReturn([]);
+
+        $response = (new ControllerTask($task))->getAllTasks();
+
+        $this->assertSame(200, $response['status']);
+        $this->assertSame([], $response['body']);
+    }
+
+    public function testGetAllTasksReturns500WhenDatabaseFails(): void
+    {
+        $task = $this->createStub(Task::class);
+        $task->method('getAll')->willThrowException(new PDOException('connection lost'));
+
+        $response = (new ControllerTask($task))->getAllTasks();
+
+        $this->assertSame(500, $response['status']);
+        $this->assertSame(['error' => 'Database error'], $response['body']);
+    }
 }

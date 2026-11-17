@@ -15,6 +15,7 @@ Este guia é para quem vai **consumir** a API (um front-end, um app, um parceiro
 
 | Método | Rota | O que faz |
 |---|---|---|
+| `GET` | `/tasks` | Lista todas as tasks |
 | `GET` | `/tasks/{id}` | Busca uma task pelo id |
 | `POST` | `/tasks` | Cria uma task |
 | `GET` | `/workers/{id}` | Busca um funcionário pelo id |
@@ -24,7 +25,7 @@ Este guia é para quem vai **consumir** a API (um front-end, um app, um parceiro
 | `POST` | `/bosses` | Cadastra um chefe |
 | `PUT` | `/bosses/{id}` | Edita um chefe |
 
-Não existe rota para listar todos os registros, nem para apagar. Só workers e bosses podem ser editados; tasks ainda não.
+Só tasks podem ser listadas (`GET /tasks`); workers e bosses ainda não. Não existe rota para apagar. Só workers e bosses podem ser editados; tasks ainda não.
 
 ### Enviando JSON
 
@@ -65,6 +66,49 @@ Todo erro vem com o código HTTP correspondente e um corpo neste formato:
 
 > `worker` e `boss` vêm como nome, não como id.
 
+### `GET /tasks`: listar todas as tasks
+
+Devolve um array com todas as tasks, ordenadas por `id`, cada uma no mesmo formato do `GET /tasks/{id}`. Não há paginação nem filtros. Se não houver nenhuma task, a resposta é `200` com `[]`.
+
+**Exemplo**
+
+```
+curl http://localhost:8000/tasks
+```
+
+**Resposta `200 OK`**
+
+```json
+[
+  {
+    "id": 1,
+    "title": "Create login page",
+    "description": "Build the login form with validation.",
+    "status": "pending",
+    "created": "2026-10-29 14:05:12.481203",
+    "modified": "2026-10-29 14:05:12.481203",
+    "worker": "Ana Silva",
+    "boss": "Fernando Alves"
+  },
+  {
+    "id": 6,
+    "title": "Planejar sprint",
+    "description": null,
+    "status": "pending",
+    "created": "2026-10-29 15:20:44.102938",
+    "modified": "2026-10-29 15:20:44.102938",
+    "worker": null,
+    "boss": "Fernando Alves"
+  }
+]
+```
+
+**Possíveis erros**
+
+| Código | Quando | Corpo |
+|---|---|---|
+| `500` | Falha no banco de dados | `{"error": "Database error"}` |
+
 ### `GET /tasks/{id}`: buscar uma task
 
 **Exemplo**
@@ -92,7 +136,6 @@ curl http://localhost:8000/tasks/1
 
 | Código | Quando | Corpo |
 |---|---|---|
-| `400` | O id não foi informado (`/tasks`) | `{"error": "ID not provided"}` |
 | `400` | O id não é um número inteiro (ex.: `/tasks/abc`) | `{"error": "The task id isn't integer"}` |
 | `404` | Não existe task com esse id | `{"error": "Task with id 99 not found"}` |
 | `500` | Falha no banco de dados | `{"error": "Database error"}` |
@@ -367,7 +410,7 @@ Valem para qualquer chamada:
 
 | Código | Significado para o cliente |
 |---|---|
-| `200` | Deu certo. O registro (buscado ou editado) está no corpo |
+| `200` | Deu certo. O registro (buscado ou editado), ou a lista de registros, está no corpo |
 | `201` | O registro (task ou funcionário) foi criado. Ele está no corpo |
 | `400` | O pedido está incompleto ou com formato errado. Corrija e envie de novo |
 | `404` | O registro ou a rota não existe |
@@ -380,4 +423,5 @@ Valem para qualquer chamada:
 - Um `title` com mais de 150 caracteres devolve `500 Database error` em vez de `400`.
 - Um id muito grande (acima de 2147483647), em `GET /tasks/{id}`, `GET /workers/{id}`, `GET /bosses/{id}` em `PUT /workers/{id}`, `PUT /bosses/{id}` ou no `boss_id`/`worker_id` de `POST /tasks`, devolve `500 Database error` em vez de `400`.
 - O corpo precisa ser JSON. Form (x-www-form-urlencoded ou multipart) devolve `400 Invalid JSON body`.
-- Ainda não há rotas para listar ou apagar registros, nem para editar tasks.
+- Ainda não há rotas para listar workers e bosses, para apagar registros, nem para editar tasks.
+- `GET /tasks` devolve todas as tasks de uma vez, sem paginação.

@@ -56,12 +56,9 @@ $url = $_SERVER['REQUEST_METHOD'] . ' ' . $resource;
 switch ($url) {
     case 'GET tasks':
         $id = routeId($segments);
-        if ($id === null) {
-            respond(400, ['error' => 'ID not provided']);
-            break;
-        }
 
-        $response = $controllerTask->getTask($id);
+        // /tasks sem id -> lista todas
+        $response = $id === null ? $controllerTask->getAllTasks() : $controllerTask->getTask($id);
         respond($response['status'], $response['body']);
         break;
     case 'GET workers':

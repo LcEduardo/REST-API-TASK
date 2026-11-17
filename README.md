@@ -98,6 +98,7 @@ Se você mudar o mapeamento no `composer.json`, rode `composer dump-autoload`.
    ```
 
 5. Teste:
+   - `GET http://localhost:8000/tasks`
    - `GET http://localhost:8000/tasks/1`
    - `GET http://localhost:8000/workers/1`
 
@@ -154,13 +155,8 @@ Fluxo do TDD, para cada comportamento novo:
 
 | Código | Significado | Quando |
 |---|---|---|
-| 200 | OK | Registro encontrado |
-| 400 | Bad Request | O id não foi informado na URL (ex.: `/tasks`) |
+| 200 | OK | Registro encontrado, ou lista de registros (`GET /tasks`, mesmo vazia) |
+| 400 | Bad Request | O id não foi informado na URL (ex.: `GET /workers`) |
 | 404 | Not Found | O id não corresponde a nenhum registro, ou a rota não existe |
 | 405 | Method Not Allowed | Método HTTP não suportado em `/tasks`, `/workers` ou `/bosses` (ex.: `DELETE`) |
 | 500 | Internal Server Error | Falha na conexão ou na consulta ao banco |
-
-## Próximos passos
-
-- Validar se o `id` é numérico e responder **400 Bad Request**.
-- Usar o POST para **criar** tasks.

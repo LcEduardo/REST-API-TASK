@@ -43,6 +43,23 @@ class ControllerTask
         ];
     }
 
+    public function getAllTasks() {
+        try {
+            $tasks = $this->task->getAll();
+        }catch(PDOException $e) {
+            return [
+                "status" => 500,
+                "body" => ['error' => 'Database error'],
+            ];
+        }
+
+        // sem tasks volta [] com 200, não 404
+        return [
+            "status" => 200,
+            "body" => $tasks,
+        ];
+    }
+
     public function createTask($worker, $boss, $description, $title) {
         try {
 
