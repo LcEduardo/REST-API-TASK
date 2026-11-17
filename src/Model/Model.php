@@ -32,6 +32,11 @@ abstract class Model
         return $row;
     }
 
+    // Total de registros da tabela (usado no "total" da paginação)
+    public function count(): int {
+        return (int) $this->conn->query("SELECT COUNT(*) FROM " . $this->getTable())->fetchColumn();
+    }
+
     // $data = ['coluna' => valor]. As chaves vêm sempre do código, nunca do usuário,
     // por isso podem entrar direto no SQL; os valores vão pelo prepared statement.
     public function create(array $data): int {
