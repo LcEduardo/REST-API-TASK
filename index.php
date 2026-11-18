@@ -54,7 +54,7 @@ $url = $_SERVER['REQUEST_METHOD'] . ' ' . $resource;
 
 
 switch ($url) {
-    case 'GET tasks':
+    case 'GET task':
         $id = routeId($segments);
         if ($id === null) {
             respond(400, ['error' => 'ID not provided']);
@@ -62,6 +62,16 @@ switch ($url) {
         }
 
         $response = $controllerTask->getTask($id);
+        respond($response['status'], $response['body']);
+        break;
+    case 'GET tasks':
+    
+        if (routeId($segments) !== null) {
+            respond(404, ['error' => 'Route not found']);
+            break;
+        }
+
+        $response = $controllerTask->getAllTasks($_GET['page'] ?? null, $_GET['per_page'] ?? null);
         respond($response['status'], $response['body']);
         break;
     case 'GET workers':
@@ -149,6 +159,7 @@ switch ($url) {
     default:
         // rota existe, mas o método não é suportado -> 405
         $allowed = [
+            'task'     => 'GET',
             'tasks'    => 'GET, POST',
             'workers'  => 'GET, POST, PUT',
             'bosses'   => 'GET, POST, PUT',

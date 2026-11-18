@@ -47,7 +47,7 @@ php -m
     │   ├── ControllerTask.php     # Monta a resposta de tasks (corpo + status HTTP)
     │   └── ControllerWorker.php   # Monta a resposta de workers (corpo + status HTTP)
     └── Model/                 # namespace App\Model
-        ├── Model.php              # Classe base com getById e create genéricos
+        ├── Model.php              # Classe base com getById, create, update e count genéricos
         ├── Boss.php               # Consultas SQL de bosses
         ├── Task.php               # Consultas SQL de tasks
         └── Worker.php             # Consultas SQL de workers
@@ -98,7 +98,8 @@ Se você mudar o mapeamento no `composer.json`, rode `composer dump-autoload`.
    ```
 
 5. Teste:
-   - `GET http://localhost:8000/tasks/1`
+   - `GET http://localhost:8000/tasks?page=1&per_page=20`
+   - `GET http://localhost:8000/task/1`
    - `GET http://localhost:8000/workers/1`
 
 ## Migrations (Phinx)
@@ -146,7 +147,7 @@ Fluxo do TDD, para cada comportamento novo:
 
 ## Papel de cada camada
 
-- **Root (`index.php`)**: é a porta de entrada. Lê o método HTTP e a URL, separa em segmentos (`/tasks/1` → recurso `tasks`, id `1`) e encaminha para o controller certo. Também valida se o id foi informado e responde quando a rota não existe ou o método não é suportado. No fim, aplica o status HTTP e devolve o JSON.
+- **Root (`index.php`)**: é a porta de entrada. Lê o método HTTP e a URL, separa em segmentos (`/task/1` → recurso `task`, id `1`) e encaminha para o controller certo. Também valida se o id foi informado e responde quando a rota não existe ou o método não é suportado. No fim, aplica o status HTTP e devolve o JSON.
 - **Controller (`ControllerTask`, `ControllerWorker`)**: recebe o model pronto, chama a consulta e transforma o resultado em resposta (`status` + `body`). É quem trata as exceções vindas do model e decide o código HTTP (200, 404, 500).
 - **Model (`Task`, `Worker`)**: só conversa com o banco, usando *prepared statements*. Não sabe nada de HTTP: se não encontra o registro, lança uma exceção e deixa o controller decidir o que responder.
 
@@ -154,13 +155,8 @@ Fluxo do TDD, para cada comportamento novo:
 
 | Código | Significado | Quando |
 |---|---|---|
-| 200 | OK | Registro encontrado |
-| 400 | Bad Request | O id não foi informado na URL (ex.: `/tasks`) |
+| 200 | OK | Registro encontrado, ou lista de registros (`GET /tasks`, mesmo vazia) |
+| 400 | Bad Request | O id não foi informado na URL (ex.: `GET /task`), ou `page`/`per_page` inválido em `GET /tasks` |
 | 404 | Not Found | O id não corresponde a nenhum registro, ou a rota não existe |
-| 405 | Method Not Allowed | Método HTTP não suportado em `/tasks`, `/workers` ou `/bosses` (ex.: `DELETE`) |
+| 405 | Method Not Allowed | Método HTTP não suportado em `/task`, `/tasks`, `/workers` ou `/bosses` (ex.: `DELETE`) |
 | 500 | Internal Server Error | Falha na conexão ou na consulta ao banco |
-
-## Próximos passos
-
-- Validar se o `id` é numérico e responder **400 Bad Request**.
-- Usar o POST para **criar** tasks.

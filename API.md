@@ -15,7 +15,8 @@ Este guia é para quem vai **consumir** a API (um front-end, um app, um parceiro
 
 | Método | Rota | O que faz |
 |---|---|---|
-| `GET` | `/tasks/{id}` | Busca uma task pelo id |
+| `GET` | `/tasks` | Lista as tasks, com paginação |
+| `GET` | `/task/{id}` | Busca uma task pelo id |
 | `POST` | `/tasks` | Cria uma task |
 | `GET` | `/workers/{id}` | Busca um funcionário pelo id |
 | `POST` | `/workers` | Cadastra um funcionário |
@@ -24,7 +25,7 @@ Este guia é para quem vai **consumir** a API (um front-end, um app, um parceiro
 | `POST` | `/bosses` | Cadastra um chefe |
 | `PUT` | `/bosses/{id}` | Edita um chefe |
 
-Não existe rota para listar todos os registros, nem para apagar. Só workers e bosses podem ser editados; tasks ainda não.
+Só tasks podem ser listadas (`GET /tasks`); workers e bosses ainda não. Não existe rota para apagar. Só workers e bosses podem ser editados; tasks ainda não.
 
 ### Enviando JSON
 
@@ -65,12 +66,72 @@ Todo erro vem com o código HTTP correspondente e um corpo neste formato:
 
 > `worker` e `boss` vêm como nome, não como id.
 
-### `GET /tasks/{id}`: buscar uma task
+### `GET /tasks`: listar as tasks (paginado)
+
+Devolve as tasks em páginas, ordenadas por `id`. Cada item de `data` tem o mesmo formato do `GET /task/{id}`.
+
+**Parâmetros da query string** (todos opcionais)
+
+| Parâmetro | Padrão | Regra | Descrição |
+|---|---|---|---|
+| `page` | `1` | inteiro, a partir de 1 | Qual página buscar |
+| `per_page` | `20` | inteiro, de 1 a 100 | Quantas tasks por página |
 
 **Exemplo**
 
 ```
-curl http://localhost:8000/tasks/1
+curl "http://localhost:8000/tasks?page=2&per_page=3"
+```
+
+**Resposta `200 OK`**
+
+```json
+{
+  "data": [
+    {
+      "id": 4,
+      "title": "Design dashboard",
+      "description": "Create the layout for the main screen.",
+      "status": "done",
+      "created": "2026-10-29 14:05:12.481203",
+      "modified": "2026-10-29 14:05:12.481203",
+      "worker": "Diego Lima",
+      "boss": "Henrique Dias"
+    },
+    ...
+  ],
+  "page": 2,
+  "per_page": 3,
+  "total": 8
+}
+```
+
+| Campo | Descrição |
+|---|---|
+| `data` | As tasks desta página |
+| `page` | A página devolvida |
+| `per_page` | Quantas tasks por página |
+| `total` | Quantas tasks existem ao todo. O número de páginas é `total / per_page`, arredondado para cima |
+
+Uma página depois da última (ou uma lista sem nenhuma task) devolve `200` com `"data": []`, não `404`.
+
+**Possíveis erros**
+
+| Código | Quando | Corpo |
+|---|---|---|
+| `400` | `page` não é um inteiro maior que zero (ex.: `?page=0`, `?page=abc`) | `{"error": "The page must be a positive integer"}` |
+| `400` | `per_page` não é um inteiro de 1 a 100 (ex.: `?per_page=500`) | `{"error": "The per_page must be an integer between 1 and 100"}` |
+| `404` | Foi passado um id (`/tasks/1`). Para buscar uma task use `/task/{id}` | `{"error": "Route not found"}` |
+| `500` | Falha no banco de dados | `{"error": "Database error"}` |
+
+### `GET /task/{id}`: buscar uma task
+
+Repare que é `task` no singular. `/tasks/{id}` devolve `404`.
+
+**Exemplo**
+
+```
+curl http://localhost:8000/task/1
 ```
 
 **Resposta `200 OK`**
@@ -92,8 +153,8 @@ curl http://localhost:8000/tasks/1
 
 | Código | Quando | Corpo |
 |---|---|---|
-| `400` | O id não foi informado (`/tasks`) | `{"error": "ID not provided"}` |
-| `400` | O id não é um número inteiro (ex.: `/tasks/abc`) | `{"error": "The task id isn't integer"}` |
+| `400` | O id não foi informado (`/task`) | `{"error": "ID not provided"}` |
+| `400` | O id não é um número inteiro (ex.: `/task/abc`) | `{"error": "The task id isn't integer"}` |
 | `404` | Não existe task com esse id | `{"error": "Task with id 99 not found"}` |
 | `500` | Falha no banco de dados | `{"error": "Database error"}` |
 
@@ -128,7 +189,7 @@ curl -X POST http://localhost:8000/tasks \
 
 **Resposta `201 Created`**
 
-Devolve a task criada, no mesmo formato do `GET /tasks/{id}`:
+Devolve a task criada, no mesmo formato do `GET /task/{id}`:
 
 ```json
 {
@@ -360,14 +421,14 @@ Valem para qualquer chamada:
 | Código | Quando | Corpo |
 |---|---|---|
 | `404` | A rota não existe (ex.: `/projetos`, `/register/worker`) | `{"error": "Route not found"}` |
-| `405` | A rota existe, mas o método não é suportado (ex.: `DELETE /tasks/1`, `PUT /tasks/1`, `DELETE /bosses/1`). O cabeçalho `Allow` diz quais métodos a rota aceita | `{"error": "Method not allowed"}` |
+| `405` | A rota existe, mas o método não é suportado (ex.: `DELETE /task/1`, `PUT /task/1`, `DELETE /bosses/1`). O cabeçalho `Allow` diz quais métodos a rota aceita | `{"error": "Method not allowed"}` |
 | `500` | A API não conseguiu se conectar ao banco | `{"error": "Database connection failed", "code": ...}` |
 
 ## Resumo dos códigos HTTP
 
 | Código | Significado para o cliente |
 |---|---|
-| `200` | Deu certo. O registro (buscado ou editado) está no corpo |
+| `200` | Deu certo. O registro (buscado ou editado), ou a lista de registros, está no corpo |
 | `201` | O registro (task ou funcionário) foi criado. Ele está no corpo |
 | `400` | O pedido está incompleto ou com formato errado. Corrija e envie de novo |
 | `404` | O registro ou a rota não existe |
@@ -378,6 +439,6 @@ Valem para qualquer chamada:
 ## Limitações atuais
 
 - Um `title` com mais de 150 caracteres devolve `500 Database error` em vez de `400`.
-- Um id muito grande (acima de 2147483647), em `GET /tasks/{id}`, `GET /workers/{id}`, `GET /bosses/{id}` em `PUT /workers/{id}`, `PUT /bosses/{id}` ou no `boss_id`/`worker_id` de `POST /tasks`, devolve `500 Database error` em vez de `400`.
+- Um id muito grande (acima de 2147483647), em `GET /task/{id}`, `GET /workers/{id}`, `GET /bosses/{id}` em `PUT /workers/{id}`, `PUT /bosses/{id}` ou no `boss_id`/`worker_id` de `POST /tasks`, devolve `500 Database error` em vez de `400`.
 - O corpo precisa ser JSON. Form (x-www-form-urlencoded ou multipart) devolve `400 Invalid JSON body`.
-- Ainda não há rotas para listar ou apagar registros, nem para editar tasks.
+- Ainda não há rotas para listar workers e bosses, para apagar registros, nem para editar tasks.
