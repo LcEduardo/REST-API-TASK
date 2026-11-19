@@ -55,25 +55,26 @@ function withJsonBody(callable $next): array {
 
 // recurso => [método => handler]. Cada handler recebe o id da URL (ou null) e devolve ['status', 'body'].
 $routes = [
+    // singular para operações em um registro (/task/{id}, POST /task); plural só para listagem (/tasks)
     'task' => [
-        'GET' => fn($id) => requireId($id, fn($id) => $controllerTask->getTask($id)),
-    ],
-    'tasks' => [
-        'GET'  => fn($id) => $id !== null
-            ? error(404, 'Route not found')
-            : $controllerTask->getAllTasks($_GET['page'] ?? null, $_GET['per_page'] ?? null),
+        'GET'  => fn($id) => requireId($id, fn($id) => $controllerTask->getTask($id)),
         'POST' => fn() => withJsonBody(fn($b) => $controllerTask->createTask(
             $b['worker_id'] ?? null, $b['boss_id'] ?? null, $b['description'] ?? null, $b['title'] ?? null
         )),
     ],
-    'workers' => [
+    'tasks' => [
+        'GET' => fn($id) => $id !== null
+            ? error(404, 'Route not found')
+            : $controllerTask->getAllTasks($_GET['page'] ?? null, $_GET['per_page'] ?? null),
+    ],
+    'worker' => [
         'GET'  => fn($id) => requireId($id, fn($id) => $controllerWorker->getWorker($id)),
         'POST' => fn() => withJsonBody(fn($b) => $controllerWorker->createWorker($b['name'] ?? null, $b['email'] ?? null)),
         'PUT'  => fn($id) => requireId($id, fn($id) => withJsonBody(
             fn($b) => $controllerWorker->updateWorker($id, $b['name'] ?? null, $b['email'] ?? null)
         )),
     ],
-    'bosses' => [
+    'boss' => [
         'GET'  => fn($id) => requireId($id, fn($id) => $controllerBoss->getBoss($id)),
         'POST' => fn() => withJsonBody(fn($b) => $controllerBoss->createBoss($b['name'] ?? null, $b['email'] ?? null)),
         'PUT'  => fn($id) => requireId($id, fn($id) => withJsonBody(

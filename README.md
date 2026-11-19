@@ -100,7 +100,7 @@ Se você mudar o mapeamento no `composer.json`, rode `composer dump-autoload`.
 5. Teste:
    - `GET http://localhost:8000/tasks?page=1&per_page=20`
    - `GET http://localhost:8000/task/1`
-   - `GET http://localhost:8000/workers/1`
+   - `GET http://localhost:8000/worker/1`
 
 ## Migrations (Phinx)
 
@@ -158,5 +158,5 @@ Fluxo do TDD, para cada comportamento novo:
 | 200 | OK | Registro encontrado, ou lista de registros (`GET /tasks`, mesmo vazia) |
 | 400 | Bad Request | O id não foi informado na URL (ex.: `GET /task`), ou `page`/`per_page` inválido em `GET /tasks` |
 | 404 | Not Found | O id não corresponde a nenhum registro, ou a rota não existe |
-| 405 | Method Not Allowed | Método HTTP não suportado em `/task`, `/tasks`, `/workers` ou `/bosses` (ex.: `DELETE`) |
+| 405 | Method Not Allowed | Método HTTP não suportado em `/task`, `/tasks`, `/worker` ou `/boss` (ex.: `DELETE`) |
 | 500 | Internal Server Error | Falha na conexão ou na consulta ao banco |

@@ -17,22 +17,22 @@ Este guia é para quem vai **consumir** a API (um front-end, um app, um parceiro
 |---|---|---|
 | `GET` | `/tasks` | Lista as tasks, com paginação |
 | `GET` | `/task/{id}` | Busca uma task pelo id |
-| `POST` | `/tasks` | Cria uma task |
-| `GET` | `/workers/{id}` | Busca um funcionário pelo id |
-| `POST` | `/workers` | Cadastra um funcionário |
-| `PUT` | `/workers/{id}` | Edita um funcionário |
-| `GET` | `/bosses/{id}` | Busca um chefe pelo id |
-| `POST` | `/bosses` | Cadastra um chefe |
-| `PUT` | `/bosses/{id}` | Edita um chefe |
+| `POST` | `/task` | Cria uma task |
+| `GET` | `/worker/{id}` | Busca um funcionário pelo id |
+| `POST` | `/worker` | Cadastra um funcionário |
+| `PUT` | `/worker/{id}` | Edita um funcionário |
+| `GET` | `/boss/{id}` | Busca um chefe pelo id |
+| `POST` | `/boss` | Cadastra um chefe |
+| `PUT` | `/boss/{id}` | Edita um chefe |
 
-Só tasks podem ser listadas (`GET /tasks`); workers e bosses ainda não. Não existe rota para apagar. Só workers e bosses podem ser editados; tasks ainda não.
+As rotas ficam no singular quando tratam de um registro (`/task/{id}`, `POST /task`, `/worker/{id}`, `/boss/{id}`) e no plural só na listagem (`GET /tasks`). Só tasks podem ser listadas; workers e bosses ainda não, então `/workers` e `/bosses` devolvem `404`. Não existe rota para apagar. Só workers e bosses podem ser editados; tasks ainda não.
 
 ### Enviando JSON
 
 Mande o header `Content-Type: application/json` e um objeto JSON no corpo. Os campos são os mesmos do form.
 
 ```
-curl -X POST http://localhost:8000/workers \
+curl -X POST http://localhost:8000/worker \
   -H "Content-Type: application/json" \
   -d '{"name": "Maria Oliveira", "email": "maria.oliveira@example.com"}'
 ```
@@ -158,7 +158,7 @@ curl http://localhost:8000/task/1
 | `404` | Não existe task com esse id | `{"error": "Task with id 99 not found"}` |
 | `500` | Falha no banco de dados | `{"error": "Database error"}` |
 
-### `POST /tasks`: criar uma task
+### `POST /task`: criar uma task
 
 Toda task nova começa com status `pending`.
 
@@ -174,7 +174,7 @@ Toda task nova começa com status `pending`.
 **Exemplo com funcionário**
 
 ```
-curl -X POST http://localhost:8000/tasks \
+curl -X POST http://localhost:8000/task \
   -H "Content-Type: application/json" \
   -d '{"title": "Revisar contrato", "description": "Conferir as cláusulas novas", "boss_id": 1, "worker_id": 2}'
 ```
@@ -182,7 +182,7 @@ curl -X POST http://localhost:8000/tasks \
 **Exemplo sem funcionário**
 
 ```
-curl -X POST http://localhost:8000/tasks \
+curl -X POST http://localhost:8000/task \
   -H "Content-Type: application/json" \
   -d '{"title": "Planejar sprint", "boss_id": 1}'
 ```
@@ -226,12 +226,12 @@ Espaços no começo e no fim de `title` são removidos antes de gravar.
 
 ## Workers (funcionários)
 
-### `GET /workers/{id}`: buscar um funcionário
+### `GET /worker/{id}`: buscar um funcionário
 
 **Exemplo**
 
 ```
-curl http://localhost:8000/workers/1
+curl http://localhost:8000/worker/1
 ```
 
 **Resposta `200 OK`**
@@ -249,12 +249,12 @@ curl http://localhost:8000/workers/1
 
 | Código | Quando | Corpo |
 |---|---|---|
-| `400` | O id não foi informado (`/workers`) | `{"error": "ID not provided"}` |
+| `400` | O id não foi informado (`/worker`) | `{"error": "ID not provided"}` |
 | `400` | O id não é um número inteiro | `{"error": "The worker_id isn't interger"}` |
 | `404` | Não existe funcionário com esse id | `{"error": "Worker with id 99 not found"}` |
 | `500` | Falha no banco de dados | `{"error": "Database error"}` |
 
-### `POST /workers`: cadastrar um funcionário
+### `POST /worker`: cadastrar um funcionário
 
 **Campos do corpo**
 
@@ -268,14 +268,14 @@ Espaços no começo e no fim de `name` e `email` são removidos antes de gravar.
 **Exemplo**
 
 ```
-curl -X POST http://localhost:8000/workers \
+curl -X POST http://localhost:8000/worker \
   -H "Content-Type: application/json" \
   -d '{"name": "Maria Oliveira", "email": "maria.oliveira@example.com"}'
 ```
 
 **Resposta `201 Created`**
 
-Devolve o funcionário criado, no mesmo formato do `GET /workers/{id}`:
+Devolve o funcionário criado, no mesmo formato do `GET /worker/{id}`:
 
 ```json
 {
@@ -286,7 +286,7 @@ Devolve o funcionário criado, no mesmo formato do `GET /workers/{id}`:
 }
 ```
 
-Guarde o `id` da resposta: ele é o `worker_id` usado em `POST /tasks`.
+Guarde o `id` da resposta: ele é o `worker_id` usado em `POST /task`.
 
 **Possíveis erros**
 
@@ -301,23 +301,23 @@ Guarde o `id` da resposta: ele é o `worker_id` usado em `POST /tasks`.
 
 Se `name` e `email` estiverem errados ao mesmo tempo, só o erro do `name` é devolvido.
 
-### `PUT /workers/{id}`: editar um funcionário
+### `PUT /worker/{id}`: editar um funcionário
 
-O `PUT` substitui os dados do funcionário: envie **sempre `name` e `email`**, mesmo que só um deles mude. As regras são as mesmas do `POST /workers` (tamanhos, email válido, espaços removidos, email em minúsculo). O `id` e o `created` não mudam.
+O `PUT` substitui os dados do funcionário: envie **sempre `name` e `email`**, mesmo que só um deles mude. As regras são as mesmas do `POST /worker` (tamanhos, email válido, espaços removidos, email em minúsculo). O `id` e o `created` não mudam.
 
 O corpo precisa ser JSON (veja [Enviando JSON](#enviando-json)).
 
 **Exemplo**
 
 ```
-curl -X PUT http://localhost:8000/workers/1 \
+curl -X PUT http://localhost:8000/worker/1 \
   -H "Content-Type: application/json" \
   -d '{"name": "Ana Silva Souza", "email": "ana.silva@example.com"}'
 ```
 
 **Resposta `200 OK`**
 
-Devolve o funcionário já atualizado, no mesmo formato do `GET /workers/{id}`:
+Devolve o funcionário já atualizado, no mesmo formato do `GET /worker/{id}`:
 
 ```json
 {
@@ -332,25 +332,25 @@ Devolve o funcionário já atualizado, no mesmo formato do `GET /workers/{id}`:
 
 | Código | Quando | Corpo |
 |---|---|---|
-| `400` | O id não foi informado (`/workers`) | `{"error": "ID not provided"}` |
+| `400` | O id não foi informado (`/worker`) | `{"error": "ID not provided"}` |
 | `400` | O id não é um número inteiro | `{"error": "The worker_id isn't interger"}` |
-| `400` | `name` ou `email` inválido (mesmos erros do `POST /workers`) | ex.: `{"error": "The name is required"}` |
+| `400` | `name` ou `email` inválido (mesmos erros do `POST /worker`) | ex.: `{"error": "The name is required"}` |
 | `404` | Não existe funcionário com esse id | `{"error": "Worker with id 99 not found"}` |
 | `409` | O email já pertence a **outro** funcionário | `{"error": "Email already registered"}` |
 | `500` | Falha no banco de dados | `{"error": "Database error"}` |
 
-Os campos são verificados nesta ordem: id, `name`, `email` e só então se o funcionário existe. Ou seja, um `PUT /workers/99` com `name` vazio devolve `400`, não `404`.
+Os campos são verificados nesta ordem: id, `name`, `email` e só então se o funcionário existe. Ou seja, um `PUT /worker/99` com `name` vazio devolve `400`, não `404`.
 
 ---
 
 ## Bosses (chefes)
 
-### `GET /bosses/{id}`: buscar um chefe
+### `GET /boss/{id}`: buscar um chefe
 
 **Exemplo**
 
 ```
-curl http://localhost:8000/bosses/1
+curl http://localhost:8000/boss/1
 ```
 
 **Resposta `200 OK`**
@@ -368,26 +368,26 @@ curl http://localhost:8000/bosses/1
 
 | Código | Quando | Corpo |
 |---|---|---|
-| `400` | O id não foi informado (`/bosses`) | `{"error": "ID not provided"}` |
+| `400` | O id não foi informado (`/boss`) | `{"error": "ID not provided"}` |
 | `400` | O id não é um número inteiro | `{"error": "The boss_id isn't interger"}` |
 | `404` | Não existe chefe com esse id | `{"error": "Boss with id 99 not found"}` |
 | `500` | Falha no banco de dados | `{"error": "Database error"}` |
 
-### `POST /bosses`: cadastrar um chefe
+### `POST /boss`: cadastrar um chefe
 
-Funciona igual ao `POST /workers`: mesmos campos (`name` até 100 caracteres, `email` válido até 150), mesmo tratamento de espaços e email em minúsculo, e os mesmos erros (`400`, `409`, `500`). Os emails de chefes e de funcionários são independentes: o mesmo email pode estar nas duas tabelas.
+Funciona igual ao `POST /worker`: mesmos campos (`name` até 100 caracteres, `email` válido até 150), mesmo tratamento de espaços e email em minúsculo, e os mesmos erros (`400`, `409`, `500`). Os emails de chefes e de funcionários são independentes: o mesmo email pode estar nas duas tabelas.
 
 **Exemplo**
 
 ```
-curl -X POST http://localhost:8000/bosses \
+curl -X POST http://localhost:8000/boss \
   -H "Content-Type: application/json" \
   -d '{"name": "Chefe Teste", "email": "chefe.teste@example.com"}'
 ```
 
 **Resposta `201 Created`**
 
-Devolve o chefe criado, no mesmo formato do `GET /bosses/{id}`:
+Devolve o chefe criado, no mesmo formato do `GET /boss/{id}`:
 
 ```json
 {
@@ -398,16 +398,16 @@ Devolve o chefe criado, no mesmo formato do `GET /bosses/{id}`:
 }
 ```
 
-Guarde o `id` da resposta: ele é o `boss_id` usado em `POST /tasks`.
+Guarde o `id` da resposta: ele é o `boss_id` usado em `POST /task`.
 
-### `PUT /bosses/{id}`: editar um chefe
+### `PUT /boss/{id}`: editar um chefe
 
-Funciona igual ao `PUT /workers/{id}`: envie sempre `name` e `email`, com as mesmas regras e os mesmos erros (`400`, `404`, `409`, `500`). A resposta `200 OK` traz o chefe atualizado, no formato do `GET /bosses/{id}`. Nos erros de id a mensagem é `The boss_id isn't interger` e `Boss with id 99 not found`.
+Funciona igual ao `PUT /worker/{id}`: envie sempre `name` e `email`, com as mesmas regras e os mesmos erros (`400`, `404`, `409`, `500`). A resposta `200 OK` traz o chefe atualizado, no formato do `GET /boss/{id}`. Nos erros de id a mensagem é `The boss_id isn't interger` e `Boss with id 99 not found`.
 
 **Exemplo**
 
 ```
-curl -X PUT http://localhost:8000/bosses/1 \
+curl -X PUT http://localhost:8000/boss/1 \
   -H "Content-Type: application/json" \
   -d '{"name": "Fernando Alves", "email": "fernando.alves@example.com"}'
 ```
@@ -421,7 +421,7 @@ Valem para qualquer chamada:
 | Código | Quando | Corpo |
 |---|---|---|
 | `404` | A rota não existe (ex.: `/projetos`, `/register/worker`) | `{"error": "Route not found"}` |
-| `405` | A rota existe, mas o método não é suportado (ex.: `DELETE /task/1`, `PUT /task/1`, `DELETE /bosses/1`). O cabeçalho `Allow` diz quais métodos a rota aceita | `{"error": "Method not allowed"}` |
+| `405` | A rota existe, mas o método não é suportado (ex.: `DELETE /task/1`, `PUT /task/1`, `DELETE /boss/1`). O cabeçalho `Allow` diz quais métodos a rota aceita | `{"error": "Method not allowed"}` |
 | `500` | A API não conseguiu se conectar ao banco | `{"error": "Database connection failed", "code": ...}` |
 
 ## Resumo dos códigos HTTP
@@ -439,6 +439,6 @@ Valem para qualquer chamada:
 ## Limitações atuais
 
 - Um `title` com mais de 150 caracteres devolve `500 Database error` em vez de `400`.
-- Um id muito grande (acima de 2147483647), em `GET /task/{id}`, `GET /workers/{id}`, `GET /bosses/{id}` em `PUT /workers/{id}`, `PUT /bosses/{id}` ou no `boss_id`/`worker_id` de `POST /tasks`, devolve `500 Database error` em vez de `400`.
+- Um id muito grande (acima de 2147483647), em `GET /task/{id}`, `GET /worker/{id}`, `GET /boss/{id}` em `PUT /worker/{id}`, `PUT /boss/{id}` ou no `boss_id`/`worker_id` de `POST /task`, devolve `500 Database error` em vez de `400`.
 - O corpo precisa ser JSON. Form (x-www-form-urlencoded ou multipart) devolve `400 Invalid JSON body`.
 - Ainda não há rotas para listar workers e bosses, para apagar registros, nem para editar tasks.
