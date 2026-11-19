@@ -42,6 +42,8 @@ php -m
 ├── config/
 │   └── database.php           # Conexão com o banco via PDO
 └── src/
+    ├── Auth/                  # namespace App\Auth
+    │   └── ApiKeyAuth.php         # Diz se a chave do header X-API-Key é de boss, de worker ou inválida
     ├── Controller/            # namespace App\Controller
     │   ├── ControllerBoss.php     # Monta a resposta de bosses (corpo + status HTTP)
     │   ├── ControllerTask.php     # Monta a resposta de tasks (corpo + status HTTP)
@@ -59,6 +61,7 @@ As classes são carregadas automaticamente pelo Composer, sem `require` manual. 
 
 | Namespace | Pasta |
 |---|---|
+| `App\Auth\` | `src/Auth/` |
 | `App\Controller\` | `src/Controller/` |
 | `App\Model\` | `src/Model/` |
 
@@ -85,6 +88,8 @@ Se você mudar o mapeamento no `composer.json`, rode `composer dump-autoload`.
    ```
 
    O `.env` está no `.gitignore`: a senha nunca vai para o repositório. Em produção, você pode definir as variáveis (`DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASS`) direto no servidor em vez de usar o arquivo. Se faltar alguma, a API responde 500 e o Phinx mostra qual variável está faltando.
+
+   Preencha também as API keys (`API_SECRET_KEY_BOSS` e `API_SECRET_KEY_WORKER`). Gere cada uma com `php -r "echo bin2hex(random_bytes(32));"`. Se uma delas ficar vazia, ninguém consegue entrar com ela: toda chamada responde 401.
 3. Crie as tabelas e insira os dados de exemplo:
 
    ```
@@ -97,7 +102,7 @@ Se você mudar o mapeamento no `composer.json`, rode `composer dump-autoload`.
    php -S localhost:8000
    ```
 
-5. Teste:
+5. Teste (mande o header `X-API-Key` com uma das chaves do `.env`):
    - `GET http://localhost:8000/tasks?page=1&per_page=20`
    - `GET http://localhost:8000/task/1`
    - `GET http://localhost:8000/worker/1`
