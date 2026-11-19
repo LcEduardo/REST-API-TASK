@@ -10,14 +10,14 @@ use App\Model\Boss;
 use App\Model\Task;
 use App\Model\Worker;
 
-$Task = new Task($db);
-$controllerTask = new ControllerTask($Task);
-
 $Worker = new Worker($db);
 $controllerWorker = new ControllerWorker($Worker);
 
 $Boss = new Boss($db);
 $controllerBoss = new ControllerBoss($Boss);
+
+$Task = new Task($db);
+$controllerTask = new ControllerTask($Task, $controllerWorker, $controllerBoss);
 
 header('Content-Type: application/json');
 
@@ -26,151 +26,78 @@ function respond(int $status, $body): void {
     echo json_encode($body);
 }
 
+// Resposta de erro no mesmo formato que os controllers devolvem
+function error(int $status, string $message): array {
+    return ['status' => $status, 'body' => ['error' => $message]];
+}
+
 // id de /recurso/{id}, ou null se não foi enviado
 function routeId(array $segments): ?string {
     $id = $segments[1] ?? null;
     return ($id === null || $id === '') ? null : $id;
 }
 
-// Corpo da requisição em JSON. Se for inválido (ou não for um objeto), já responde 400 e devolve null.
-function requestBody(): ?array {
+// Só chama $next se o id foi enviado; senão responde 400
+function requireId(?string $id, callable $next): array {
+    return $id === null ? error(400, 'ID not provided') : $next($id);
+}
+
+// Lê o corpo JSON e passa para $next. Se for inválido (ou não for um objeto), responde 400.
+function withJsonBody(callable $next): array {
     $body = json_decode(file_get_contents('php://input'), true);
 
     if (json_last_error() !== JSON_ERROR_NONE || !is_array($body)) {
-        respond(400, ['error' => 'Invalid JSON body']);
-        return null;
+        return error(400, 'Invalid JSON body');
     }
 
-    return $body;
+    return $next($body);
 }
+
+// recurso => [método => handler]. Cada handler recebe o id da URL (ou null) e devolve ['status', 'body'].
+$routes = [
+    'task' => [
+        'GET' => fn($id) => requireId($id, fn($id) => $controllerTask->getTask($id)),
+    ],
+    'tasks' => [
+        'GET'  => fn($id) => $id !== null
+            ? error(404, 'Route not found')
+            : $controllerTask->getAllTasks($_GET['page'] ?? null, $_GET['per_page'] ?? null),
+        'POST' => fn() => withJsonBody(fn($b) => $controllerTask->createTask(
+            $b['worker_id'] ?? null, $b['boss_id'] ?? null, $b['description'] ?? null, $b['title'] ?? null
+        )),
+    ],
+    'workers' => [
+        'GET'  => fn($id) => requireId($id, fn($id) => $controllerWorker->getWorker($id)),
+        'POST' => fn() => withJsonBody(fn($b) => $controllerWorker->createWorker($b['name'] ?? null, $b['email'] ?? null)),
+        'PUT'  => fn($id) => requireId($id, fn($id) => withJsonBody(
+            fn($b) => $controllerWorker->updateWorker($id, $b['name'] ?? null, $b['email'] ?? null)
+        )),
+    ],
+    'bosses' => [
+        'GET'  => fn($id) => requireId($id, fn($id) => $controllerBoss->getBoss($id)),
+        'POST' => fn() => withJsonBody(fn($b) => $controllerBoss->createBoss($b['name'] ?? null, $b['email'] ?? null)),
+        'PUT'  => fn($id) => requireId($id, fn($id) => withJsonBody(
+            fn($b) => $controllerBoss->updateBoss($id, $b['name'] ?? null, $b['email'] ?? null)
+        )),
+    ],
+];
 
 $base = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'])), '/'); // "" na raiz, ou "/subpasta" se o index.php estiver em uma
 $path = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH); // /tasks/1
 $path = substr($path, strlen($base)); // /tasks/1
 $segments = explode('/', trim($path, '/'));  // ["tasks"] ou ["tasks", "1"]
 $resource = $segments[0]; // "tasks"
+$method = $_SERVER['REQUEST_METHOD'];
 
-$url = $_SERVER['REQUEST_METHOD'] . ' ' . $resource;
-
-
-switch ($url) {
-    case 'GET task':
-        $id = routeId($segments);
-        if ($id === null) {
-            respond(400, ['error' => 'ID not provided']);
-            break;
-        }
-
-        $response = $controllerTask->getTask($id);
-        respond($response['status'], $response['body']);
-        break;
-    case 'GET tasks':
-    
-        if (routeId($segments) !== null) {
-            respond(404, ['error' => 'Route not found']);
-            break;
-        }
-
-        $response = $controllerTask->getAllTasks($_GET['page'] ?? null, $_GET['per_page'] ?? null);
-        respond($response['status'], $response['body']);
-        break;
-    case 'GET workers':
-        $id = routeId($segments);
-        if ($id === null) {
-            respond(400, ['error' => 'ID not provided']);
-            break;
-        }
-
-        $response = $controllerWorker->getWorker($id);
-        respond($response['status'], $response['body']);
-        break;
-    case 'GET bosses':
-        $id = routeId($segments);
-        if ($id === null) {
-            respond(400, ['error' => 'ID not provided']);
-            break;
-        }
-
-        $response = $controllerBoss->getBoss($id);
-        respond($response['status'], $response['body']);
-        break;
-    case 'POST tasks':
-        $body = requestBody();
-        if ($body === null) break;
-
-        $workerId = $body['worker_id'] ?? null;
-        $bossId = $body['boss_id'] ?? null;
-        $title = $body['title'] ?? null;
-
-        $worker = $controllerWorker->getWorker($workerId); // body null se o worker_id não foi enviado
-        $boss = $controllerBoss->getBoss($bossId); // sempre retornar um array
-
-        if ($boss['status'] !== 200) {
-            respond($boss['status'], $boss['body']);
-            break;
-        } elseif ($worker['status'] !== 200) {
-            respond($worker['status'], $worker['body']);
-            break;
-        }
-
-        $response = $controllerTask->createTask($worker['body'], $boss['body'], $body['description'] ?? null, $title);
-        respond($response['status'], $response['body']);
-        break;
-    case 'POST workers':
-        $body = requestBody();
-        if ($body === null) break;
-
-        $response = $controllerWorker->createWorker($body['name'] ?? null, $body['email'] ?? null);
-        respond($response['status'], $response['body']);
-        break;
-    case 'POST bosses':
-        $body = requestBody();
-        if ($body === null) break;
-
-        $response = $controllerBoss->createBoss($body['name'] ?? null, $body['email'] ?? null);
-        respond($response['status'], $response['body']);
-        break;
-    case 'PUT workers':
-        $id = routeId($segments);
-        if ($id === null) {
-            respond(400, ['error' => 'ID not provided']);
-            break;
-        }
-
-        $body = requestBody();
-        if ($body === null) break;
-
-        $response = $controllerWorker->updateWorker($id, $body['name'] ?? null, $body['email'] ?? null);
-        respond($response['status'], $response['body']);
-        break;
-    case 'PUT bosses':
-        $id = routeId($segments);
-        if ($id === null) {
-            respond(400, ['error' => 'ID not provided']);
-            break;
-        }
-
-        $body = requestBody();
-        if ($body === null) break;
-
-        $response = $controllerBoss->updateBoss($id, $body['name'] ?? null, $body['email'] ?? null);
-        respond($response['status'], $response['body']);
-        break;
-    default:
-        // rota existe, mas o método não é suportado -> 405
-        $allowed = [
-            'task'     => 'GET',
-            'tasks'    => 'GET, POST',
-            'workers'  => 'GET, POST, PUT',
-            'bosses'   => 'GET, POST, PUT',
-        ];
-
-        if (isset($allowed[$resource])) {
-            header('Allow: ' . $allowed[$resource]);
-            respond(405, ['error' => 'Method not allowed']);
-            break;
-        }
-
-        // rota não existe -> 404 (erro do cliente, por isso não é 500)
-        respond(404, ['error' => 'Route not found']);
+if (!isset($routes[$resource])) {
+    // rota não existe -> 404 (erro do cliente, por isso não é 500)
+    $response = error(404, 'Route not found');
+} elseif (!isset($routes[$resource][$method])) {
+    // rota existe, mas o método não é suportado -> 405 (Allow gerado a partir da tabela de rotas)
+    header('Allow: ' . implode(', ', array_keys($routes[$resource])));
+    $response = error(405, 'Method not allowed');
+} else {
+    $response = $routes[$resource][$method](routeId($segments));
 }
+
+respond($response['status'], $response['body']);

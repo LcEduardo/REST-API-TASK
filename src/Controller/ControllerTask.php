@@ -9,9 +9,13 @@ use PDOException;
 class ControllerTask 
 {
     private Task $task;
+    private ControllerWorker $controllerWorker;
+    private ControllerBoss $controllerBoss;
 
-    public function __construct(Task $task) {
+    public function __construct(Task $task, ControllerWorker $controllerWorker, ControllerBoss $controllerBoss) {
         $this->task = $task;
+        $this->controllerWorker = $controllerWorker;
+        $this->controllerBoss = $controllerBoss;
     }
 
     public function getTask($id) {
@@ -86,7 +90,20 @@ class ControllerTask
         ];
     }
 
-    public function createTask($worker, $boss, $description, $title) {
+    public function createTask($workerId, $bossId, $description, $title) {
+        // valida boss (obrigatório) e worker (opcional) antes de criar; o erro deles volta como está
+        $boss = $this->controllerBoss->getBoss($bossId);
+
+        if ($boss['status'] !== 200) {
+            return $boss;
+        }
+
+        $worker = $this->controllerWorker->getWorker($workerId); // body null se o worker_id não foi enviado
+
+        if ($worker['status'] !== 200) {
+            return $worker;
+        }
+
         try {
 
             // title[]=a chega como array; trim() em array lança TypeError (não é Exception)
@@ -105,8 +122,8 @@ class ControllerTask
                 'title'       => $title,
                 'description' => $description,
                 'status'      => 'pending',   //default
-                'worker_id'   => $worker['id'] ?? null,
-                'boss_id'     => $boss['id'],
+                'worker_id'   => $worker['body']['id'] ?? null,
+                'boss_id'     => $boss['body']['id'],
             ]);
 
             $task = $this->task->getById($taskId);

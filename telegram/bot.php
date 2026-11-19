@@ -8,10 +8,18 @@ Dotenv\Dotenv::createImmutable(__DIR__ . '/..')->load();
 require __DIR__ . '/../config/database.php';
 require __DIR__ . '/commands.php';
 
+use App\Controller\ControllerBoss;
 use App\Controller\ControllerTask;
+use App\Controller\ControllerWorker;
+use App\Model\Boss;
 use App\Model\Task;
+use App\Model\Worker;
 
-$controllerTask = new ControllerTask(new Task($db));
+$controllerTask = new ControllerTask(
+    new Task($db),
+    new ControllerWorker(new Worker($db)),
+    new ControllerBoss(new Boss($db))
+);
 
 $api = 'https://api.telegram.org/bot' . $_ENV['TOKEN_TELEGRAM'] . '/';
 $offset = 0;
