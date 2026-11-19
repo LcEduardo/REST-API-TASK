@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Controller;
 
+use App\Controller\ControllerBoss;
 use App\Controller\ControllerTask;
+use App\Controller\ControllerWorker;
 use App\Model\Task;
 use PDOException;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -12,13 +14,18 @@ use PHPUnit\Framework\TestCase;
 
 final class ControllerTaskTest extends TestCase
 {
+    private function controller(Task $task): ControllerTask
+    {
+        return new ControllerTask($task, $this->createStub(ControllerWorker::class), $this->createStub(ControllerBoss::class));
+    }
+
     public function testGetTaskReturns400WhenIdIsNotInteger(): void
     {
         // GET /tasks/avc: o Postgres lança PDOException para "avc" em coluna integer, o que virava 500
         $task = $this->createStub(Task::class);
         $task->method('getById')->willThrowException(new PDOException('invalid input syntax for type integer'));
 
-        $response = (new ControllerTask($task))->getTask('avc');
+        $response = ($this->controller($task))->getTask('avc');
 
         $this->assertSame(400, $response['status']);
     }
@@ -28,7 +35,7 @@ final class ControllerTaskTest extends TestCase
         $task = $this->createMock(Task::class);
         $task->expects($this->never())->method('getById');
 
-        (new ControllerTask($task))->getTask('avc');
+        ($this->controller($task))->getTask('avc');
     }
 
     public function testGetTaskReturns200WithTheTask(): void
@@ -38,7 +45,7 @@ final class ControllerTaskTest extends TestCase
         $task = $this->createStub(Task::class);
         $task->method('getById')->willReturn($row);
 
-        $response = (new ControllerTask($task))->getTask('1');
+        $response = ($this->controller($task))->getTask('1');
 
         $this->assertSame(200, $response['status']);
         $this->assertSame($row, $response['body']);
@@ -55,7 +62,7 @@ final class ControllerTaskTest extends TestCase
         $task->expects($this->once())->method('getAll')->with(20, 0)->willReturn($rows);
         $task->method('count')->willReturn(2);
 
-        $response = (new ControllerTask($task))->getAllTasks(null, null);
+        $response = ($this->controller($task))->getAllTasks(null, null);
 
         $this->assertSame(200, $response['status']);
         $this->assertSame([
@@ -73,7 +80,7 @@ final class ControllerTaskTest extends TestCase
         $task->expects($this->once())->method('getAll')->with(10, 20)->willReturn([]);
         $task->method('count')->willReturn(25);
 
-        $response = (new ControllerTask($task))->getAllTasks('3', '10');
+        $response = ($this->controller($task))->getAllTasks('3', '10');
 
         $this->assertSame(200, $response['status']);
         $this->assertSame(3, $response['body']['page']);
@@ -88,7 +95,7 @@ final class ControllerTaskTest extends TestCase
         $task->method('getAll')->willReturn([]);
         $task->method('count')->willReturn(0);
 
-        $response = (new ControllerTask($task))->getAllTasks('5', null);
+        $response = ($this->controller($task))->getAllTasks('5', null);
 
         $this->assertSame(200, $response['status']);
         $this->assertSame([], $response['body']['data']);
@@ -114,7 +121,7 @@ final class ControllerTaskTest extends TestCase
         $task = $this->createMock(Task::class);
         $task->expects($this->never())->method('getAll');
 
-        $response = (new ControllerTask($task))->getAllTasks($page, null);
+        $response = ($this->controller($task))->getAllTasks($page, null);
 
         $this->assertSame(400, $response['status']);
         $this->assertSame(['error' => 'The page must be a positive integer'], $response['body']);
@@ -137,7 +144,7 @@ final class ControllerTaskTest extends TestCase
         $task = $this->createMock(Task::class);
         $task->expects($this->never())->method('getAll');
 
-        $response = (new ControllerTask($task))->getAllTasks(null, $perPage);
+        $response = ($this->controller($task))->getAllTasks(null, $perPage);
 
         $this->assertSame(400, $response['status']);
         $this->assertSame(['error' => 'The per_page must be an integer between 1 and 100'], $response['body']);
@@ -149,7 +156,7 @@ final class ControllerTaskTest extends TestCase
         $task->expects($this->once())->method('getAll')->with(100, 0)->willReturn([]);
         $task->method('count')->willReturn(0);
 
-        $response = (new ControllerTask($task))->getAllTasks(null, '100');
+        $response = ($this->controller($task))->getAllTasks(null, '100');
 
         $this->assertSame(200, $response['status']);
     }
@@ -159,9 +166,92 @@ final class ControllerTaskTest extends TestCase
         $task = $this->createStub(Task::class);
         $task->method('getAll')->willThrowException(new PDOException('connection lost'));
 
-        $response = (new ControllerTask($task))->getAllTasks(null, null);
+        $response = ($this->controller($task))->getAllTasks(null, null);
 
         $this->assertSame(500, $response['status']);
         $this->assertSame(['error' => 'Database error'], $response['body']);
+    }
+
+    private function createController(Task $task, array $boss, array $worker): ControllerTask
+    {
+        $controllerBoss = $this->createStub(ControllerBoss::class);
+        $controllerBoss->method('getBoss')->willReturn($boss);
+
+        $controllerWorker = $this->createStub(ControllerWorker::class);
+        $controllerWorker->method('getWorker')->willReturn($worker);
+
+        return new ControllerTask($task, $controllerWorker, $controllerBoss);
+    }
+
+    public function testCreateTaskReturnsBossErrorAndDoesNotCreateWhenBossIsInvalid(): void
+    {
+        $bossError = ['status' => 404, 'body' => ['error' => 'Boss with id 999 not found']];
+
+        $task = $this->createMock(Task::class);
+        $task->expects($this->never())->method('create');
+
+        $response = $this->createController($task, $bossError, ['status' => 200, 'body' => null])
+            ->createTask(null, '999', null, 'Tarefa');
+
+        $this->assertSame($bossError, $response);
+    }
+
+    public function testCreateTaskChecksBossBeforeWorker(): void
+    {
+        // os dois inválidos: o erro do boss é o que volta
+        $bossError = ['status' => 400, 'body' => ['error' => "The boss_id isn't interger"]];
+        $workerError = ['status' => 400, 'body' => ['error' => "The worker_id isn't interger"]];
+
+        $response = $this->createController($this->createStub(Task::class), $bossError, $workerError)
+            ->createTask('abc', 'abc', null, 'Tarefa');
+
+        $this->assertSame($bossError, $response);
+    }
+
+    public function testCreateTaskReturnsWorkerErrorAndDoesNotCreateWhenWorkerIsInvalid(): void
+    {
+        $workerError = ['status' => 404, 'body' => ['error' => 'Worker with id 999 not found']];
+
+        $task = $this->createMock(Task::class);
+        $task->expects($this->never())->method('create');
+
+        $response = $this->createController($task, ['status' => 200, 'body' => ['id' => 2]], $workerError)
+            ->createTask('999', '2', null, 'Tarefa');
+
+        $this->assertSame($workerError, $response);
+    }
+
+    public function testCreateTaskSavesTheIdsOfBossAndWorker(): void
+    {
+        $task = $this->createMock(Task::class);
+        $task->expects($this->once())->method('create')->with([
+            'title'       => 'Tarefa',
+            'description' => 'Desc',
+            'status'      => 'pending',
+            'worker_id'   => 1,
+            'boss_id'     => 2,
+        ])->willReturn(10);
+        $task->method('getById')->willReturn(['id' => 10]);
+
+        $response = $this->createController($task, ['status' => 200, 'body' => ['id' => 2]], ['status' => 200, 'body' => ['id' => 1]])
+            ->createTask('1', '2', 'Desc', 'Tarefa');
+
+        $this->assertSame(201, $response['status']);
+        $this->assertSame(['id' => 10], $response['body']);
+    }
+
+    public function testCreateTaskSavesNullWorkerWhenWorkerIsNotSent(): void
+    {
+        // worker é opcional: getWorker devolve body null
+        $task = $this->createMock(Task::class);
+        $task->expects($this->once())->method('create')
+            ->with($this->callback(fn(array $data) => $data['worker_id'] === null && $data['boss_id'] === 2))
+            ->willReturn(10);
+        $task->method('getById')->willReturn(['id' => 10]);
+
+        $response = $this->createController($task, ['status' => 200, 'body' => ['id' => 2]], ['status' => 200, 'body' => null])
+            ->createTask(null, '2', null, 'Tarefa');
+
+        $this->assertSame(201, $response['status']);
     }
 }
