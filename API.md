@@ -9,7 +9,7 @@ Este guia é para quem vai **consumir** a API (um front-end, um app, um parceiro
 | **URL base** | `http://localhost:8000` (ambiente local; troque pelo endereço do servidor onde a API estiver publicada) |
 | **Formato das respostas** | JSON (`Content-Type: application/json`) |
 | **Formato do envio (POST e PUT)** | JSON (`Content-Type: application/json`). Form (`x-www-form-urlencoded` / `multipart/form-data`) não é aceito. |
-| **Autenticação** | Nenhuma |
+| **Autenticação** | API key no header `X-API-Key` (veja [Autenticação](#autenticação)) |
 
 ### Endpoints
 
@@ -27,12 +27,27 @@ Este guia é para quem vai **consumir** a API (um front-end, um app, um parceiro
 
 As rotas ficam no singular quando tratam de um registro (`/task/{id}`, `POST /task`, `/worker/{id}`, `/boss/{id}`) e no plural só na listagem (`GET /tasks`). Só tasks podem ser listadas; workers e bosses ainda não, então `/workers` e `/bosses` devolvem `404`. Não existe rota para apagar. Só workers e bosses podem ser editados; tasks ainda não.
 
+### Autenticação
+
+Toda chamada precisa do header `X-API-Key` com uma chave válida. Existem duas chaves, uma para chefes (boss) e uma para funcionários (worker). Peça a sua para quem administra a API.
+
+```
+curl http://localhost:8000/task/1 -H "X-API-Key: SUA_CHAVE"
+```
+
+Sem o header, com ele vazio ou com uma chave errada, a resposta é `401 {"error": "Invalid or missing API key"}`. Isso vale para qualquer rota, inclusive as que não existem: sem chave válida você recebe `401`, não `404`.
+
+Por enquanto as duas chaves podem acessar todas as rotas. Em breve, a chave de worker não vai poder criar tasks nem editar registros (`POST` e `PUT`).
+
+Os exemplos de `curl` abaixo omitem o header para ficarem mais curtos. Adicione `-H "X-API-Key: SUA_CHAVE"` em todos.
+
 ### Enviando JSON
 
 Mande o header `Content-Type: application/json` e um objeto JSON no corpo. Os campos são os mesmos do form.
 
 ```
 curl -X POST http://localhost:8000/worker \
+  -H "X-API-Key: SUA_CHAVE" \
   -H "Content-Type: application/json" \
   -d '{"name": "Maria Oliveira", "email": "maria.oliveira@example.com"}'
 ```
@@ -420,6 +435,7 @@ Valem para qualquer chamada:
 
 | Código | Quando | Corpo |
 |---|---|---|
+| `401` | Faltou o header `X-API-Key`, ele veio vazio ou a chave é inválida. É checado antes da rota | `{"error": "Invalid or missing API key"}` |
 | `404` | A rota não existe (ex.: `/projetos`, `/register/worker`) | `{"error": "Route not found"}` |
 | `405` | A rota existe, mas o método não é suportado (ex.: `DELETE /task/1`, `PUT /task/1`, `DELETE /boss/1`). O cabeçalho `Allow` diz quais métodos a rota aceita | `{"error": "Method not allowed"}` |
 | `500` | A API não conseguiu se conectar ao banco | `{"error": "Database connection failed", "code": ...}` |
@@ -431,6 +447,7 @@ Valem para qualquer chamada:
 | `200` | Deu certo. O registro (buscado ou editado), ou a lista de registros, está no corpo |
 | `201` | O registro (task ou funcionário) foi criado. Ele está no corpo |
 | `400` | O pedido está incompleto ou com formato errado. Corrija e envie de novo |
+| `401` | Sem API key ou com uma chave inválida. Envie o header `X-API-Key` com a sua chave |
 | `404` | O registro ou a rota não existe |
 | `409` | Conflito com um registro que já existe (ex.: email já cadastrado). Não adianta reenviar igual |
 | `405` | Esse método não é aceito nessa rota |
@@ -442,3 +459,4 @@ Valem para qualquer chamada:
 - Um id muito grande (acima de 2147483647), em `GET /task/{id}`, `GET /worker/{id}`, `GET /boss/{id}` em `PUT /worker/{id}`, `PUT /boss/{id}` ou no `boss_id`/`worker_id` de `POST /task`, devolve `500 Database error` em vez de `400`.
 - O corpo precisa ser JSON. Form (x-www-form-urlencoded ou multipart) devolve `400 Invalid JSON body`.
 - Ainda não há rotas para listar workers e bosses, para apagar registros, nem para editar tasks.
+- As chaves de boss e de worker ainda têm as mesmas permissões: as duas acessam todas as rotas.

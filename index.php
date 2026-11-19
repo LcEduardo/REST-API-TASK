@@ -3,6 +3,7 @@
 require __DIR__ . "/vendor/autoload.php";
 require __DIR__ . "/config/database.php";
 
+use App\Auth\ApiKeyAuth;
 use App\Controller\ControllerBoss;
 use App\Controller\ControllerTask;
 use App\Controller\ControllerWorker;
@@ -90,7 +91,17 @@ $segments = explode('/', trim($path, '/'));  // ["tasks"] ou ["tasks", "1"]
 $resource = $segments[0]; // "tasks"
 $method = $_SERVER['REQUEST_METHOD'];
 
-if (!isset($routes[$resource])) {
+// Chave enviada no header X-API-Key -> papel ('boss' ou 'worker'). Por enquanto os dois acessam tudo.
+$auth = new ApiKeyAuth([
+    'boss'   => $_ENV['API_SECRET_KEY_BOSS'] ?? null,
+    'worker' => $_ENV['API_SECRET_KEY_WORKER'] ?? null,
+]);
+$role = $auth->roleFor($_SERVER['HTTP_X_API_KEY'] ?? null);
+
+if ($role === null) {
+    // sem chave ou chave inválida -> 401, antes de olhar a rota (não revela quais rotas existem)
+    $response = error(401, 'Invalid or missing API key');
+} elseif (!isset($routes[$resource])) {
     // rota não existe -> 404 (erro do cliente, por isso não é 500)
     $response = error(404, 'Route not found');
 } elseif (!isset($routes[$resource][$method])) {
