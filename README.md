@@ -34,6 +34,7 @@ php -m
 ├── .env                       # Suas credenciais do banco (NÃO vai para o git)
 ├── phinx.php                  # Configuração das migrations (conexão com o banco)
 ├── phpunit.xml                # Configuração dos testes
+├── docs/                      # Explicações detalhadas de partes do código
 ├── tests/                     # namespace Tests
 │   └── Unit/                  # Testes de unidade (não usam o banco)
 ├── db/
@@ -152,9 +153,15 @@ Fluxo do TDD, para cada comportamento novo:
 
 ## Papel de cada camada
 
-- **Root (`index.php`)**: é a porta de entrada. Lê o método HTTP e a URL, separa em segmentos (`/task/1` → recurso `task`, id `1`) e encaminha para o controller certo. Também valida se o id foi informado e responde quando a rota não existe ou o método não é suportado. No fim, aplica o status HTTP e devolve o JSON.
+- **Root (`index.php`)**: é a porta de entrada. Primeiro confere a API key (veja [Autorização](#autorização-api-keys)). Depois lê o método HTTP e a URL, separa em segmentos (`/task/1` → recurso `task`, id `1`) e encaminha para o controller certo. Também valida se o id foi informado e responde quando a rota não existe ou o método não é suportado. No fim, aplica o status HTTP e devolve o JSON.
 - **Controller (`ControllerTask`, `ControllerWorker`)**: recebe o model pronto, chama a consulta e transforma o resultado em resposta (`status` + `body`). É quem trata as exceções vindas do model e decide o código HTTP (200, 404, 500).
 - **Model (`Task`, `Worker`)**: só conversa com o banco, usando *prepared statements*. Não sabe nada de HTTP: se não encontra o registro, lança uma exceção e deixa o controller decidir o que responder.
+
+## Autorização (API keys)
+
+Toda requisição precisa do header `X-API-Key` com a chave de boss ou de worker (as duas ficam no `.env`). Sem chave válida, a API responde `401` antes mesmo de olhar a rota. Quem confere a chave é `src/Auth/ApiKeyAuth.php`, chamado no começo do roteamento em `index.php`.
+
+Explicação completa do código, passo a passo com o exemplo `GET /task/{id}`: [docs/autorizacao-api-keys.md](docs/autorizacao-api-keys.md).
 
 ## Status HTTP usados
 
@@ -162,6 +169,7 @@ Fluxo do TDD, para cada comportamento novo:
 |---|---|---|
 | 200 | OK | Registro encontrado, ou lista de registros (`GET /tasks`, mesmo vazia) |
 | 400 | Bad Request | O id não foi informado na URL (ex.: `GET /task`), ou `page`/`per_page` inválido em `GET /tasks` |
+| 401 | Unauthorized | Faltou o header `X-API-Key`, ele veio vazio ou a chave é inválida |
 | 404 | Not Found | O id não corresponde a nenhum registro, ou a rota não existe |
 | 405 | Method Not Allowed | Método HTTP não suportado em `/task`, `/tasks`, `/worker` ou `/boss` (ex.: `DELETE`) |
 | 500 | Internal Server Error | Falha na conexão ou na consulta ao banco |
