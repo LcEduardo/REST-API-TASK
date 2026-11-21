@@ -54,6 +54,19 @@ function withJsonBody(callable $next): array {
     return $next($body);
 }
 
+// Key sent in the X-API-Key header -> role ('boss' or 'worker').
+// Calculated before the route table so the handlers can check the role.
+$auth = new ApiKeyAuth([
+    'boss'   => $_ENV['API_SECRET_KEY_BOSS'] ?? null,
+    'worker' => $_ENV['API_SECRET_KEY_WORKER'] ?? null,
+]);
+$role = $auth->roleFor($_SERVER['HTTP_X_API_KEY'] ?? null);
+
+// Only calls $next if the caller has the required role; otherwise responds 403
+function requireRole(?string $role, string $required, callable $next): array {
+    return $role === $required ? $next() : error(403, 'Access Denied');
+}
+
 // recurso => [método => handler]. Cada handler recebe o id da URL (ou null) e devolve ['status', 'body'].
 $routes = [
     // singular para operações em um registro (/task/{id}, POST /task); plural só para listagem (/tasks)
@@ -70,7 +83,10 @@ $routes = [
     ],
     'worker' => [
         'GET'  => fn($id) => requireId($id, fn($id) => $controllerWorker->getWorker($id)),
-        'POST' => fn() => withJsonBody(fn($b) => $controllerWorker->createWorker($b['name'] ?? null, $b['email'] ?? null)),
+        // only a boss can create workers (the response carries the new worker's API key)
+        'POST' => fn() => requireRole($role, 'boss', fn() => withJsonBody(
+            fn($b) => $controllerWorker->createWorker($b['name'] ?? null, $b['email'] ?? null)
+        )),
         'PUT'  => fn($id) => requireId($id, fn($id) => withJsonBody(
             fn($b) => $controllerWorker->updateWorker($id, $b['name'] ?? null, $b['email'] ?? null)
         )),
@@ -90,13 +106,6 @@ $path = substr($path, strlen($base)); // /tasks/1
 $segments = explode('/', trim($path, '/'));  // ["tasks"] ou ["tasks", "1"]
 $resource = $segments[0]; // "tasks"
 $method = $_SERVER['REQUEST_METHOD'];
-
-// Chave enviada no header X-API-Key -> papel ('boss' ou 'worker'). Por enquanto os dois acessam tudo.
-$auth = new ApiKeyAuth([
-    'boss'   => $_ENV['API_SECRET_KEY_BOSS'] ?? null,
-    'worker' => $_ENV['API_SECRET_KEY_WORKER'] ?? null,
-]);
-$role = $auth->roleFor($_SERVER['HTTP_X_API_KEY'] ?? null);
 
 if ($role === null) {
     // sem chave ou chave inválida -> 401, antes de olhar a rota (não revela quais rotas existem)

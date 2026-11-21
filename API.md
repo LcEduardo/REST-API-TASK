@@ -19,7 +19,7 @@ Este guia é para quem vai **consumir** a API (um front-end, um app, um parceiro
 | `GET` | `/task/{id}` | Busca uma task pelo id |
 | `POST` | `/task` | Cria uma task |
 | `GET` | `/worker/{id}` | Busca um funcionário pelo id |
-| `POST` | `/worker` | Cadastra um funcionário |
+| `POST` | `/worker` | Cadastra um funcionário e gera a API key dele (só boss) |
 | `PUT` | `/worker/{id}` | Edita um funcionário |
 | `GET` | `/boss/{id}` | Busca um chefe pelo id |
 | `POST` | `/boss` | Cadastra um chefe |
@@ -37,7 +37,7 @@ curl http://localhost:8000/task/1 -H "X-API-Key: SUA_CHAVE"
 
 Sem o header, com ele vazio ou com uma chave errada, a resposta é `401 {"error": "Invalid or missing API key"}`. Isso vale para qualquer rota, inclusive as que não existem: sem chave válida você recebe `401`, não `404`.
 
-Por enquanto as duas chaves podem acessar todas as rotas. Em breve, a chave de worker não vai poder criar tasks nem editar registros (`POST` e `PUT`).
+Por enquanto as duas chaves podem acessar quase todas as rotas. A exceção é `POST /worker`, que só a chave de boss pode chamar: com a chave de worker a resposta é `403 {"error": "Access Denied"}`. Em breve, a chave de worker também não vai poder criar tasks nem editar registros (`POST` e `PUT`).
 
 Os exemplos de `curl` abaixo omitem o header para ficarem mais curtos. Adicione `-H "X-API-Key: SUA_CHAVE"` em todos.
 
@@ -271,6 +271,8 @@ curl http://localhost:8000/worker/1
 
 ### `POST /worker`: cadastrar um funcionário
 
+Só a chave de **boss** pode chamar esta rota. Além de cadastrar o funcionário, ela gera uma API key nova para ele.
+
 **Campos do corpo**
 
 | Campo | Obrigatório | Tipo | Descrição |
@@ -290,18 +292,21 @@ curl -X POST http://localhost:8000/worker \
 
 **Resposta `201 Created`**
 
-Devolve o funcionário criado, no mesmo formato do `GET /worker/{id}`:
+Devolve o funcionário criado, no mesmo formato do `GET /worker/{id}`, mais o campo `api_key`:
 
 ```json
 {
   "id": 6,
   "name": "Maria Oliveira",
   "email": "maria.oliveira@example.com",
-  "created": "2026-10-30 09:46:54.879862"
+  "created": "2026-10-30 09:46:54.879862",
+  "api_key": "3f9c0e7a1b...(64 caracteres)"
 }
 ```
 
 Guarde o `id` da resposta: ele é o `worker_id` usado em `POST /task`.
+
+> **A `api_key` aparece só nesta resposta.** A API guarda apenas um hash (SHA-256) dela, então não é possível consultá-la depois: o `GET /worker/{id}` e o `PUT /worker/{id}` não a devolvem. Entregue a chave ao funcionário logo após o cadastro.
 
 **Possíveis erros**
 
@@ -311,10 +316,11 @@ Guarde o `id` da resposta: ele é o `worker_id` usado em `POST /task`.
 | `400` | `name` tem mais de 100 caracteres | `{"error": "The name must have at most 100 characters"}` |
 | `400` | `email` não foi enviado ou não é um email válido | `{"error": "The email isn't valid"}` |
 | `400` | `email` tem mais de 150 caracteres | `{"error": "The email must have at most 150 characters"}` |
+| `403` | A chave enviada não é a de boss | `{"error": "Access Denied"}` |
 | `409` | Já existe um funcionário com esse email | `{"error": "Email already registered"}` |
 | `500` | Falha no banco de dados | `{"error": "Database error"}` |
 
-Se `name` e `email` estiverem errados ao mesmo tempo, só o erro do `name` é devolvido.
+Se `name` e `email` estiverem errados ao mesmo tempo, só o erro do `name` é devolvido. O `403` é verificado antes de tudo: com a chave de worker o corpo nem é lido.
 
 ### `PUT /worker/{id}`: editar um funcionário
 
