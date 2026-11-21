@@ -6,7 +6,7 @@ use App\Model\Task;
 use Exception;
 use PDOException;
 
-class ControllerTask 
+class ControllerTask extends Controller
 {
     private Task $task;
     private ControllerWorker $controllerWorker;
