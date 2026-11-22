@@ -29,7 +29,7 @@ As rotas ficam no singular quando tratam de um registro (`/task/{id}`, `POST /ta
 
 ### Autenticação
 
-Toda chamada precisa do header `X-API-Key` com uma chave válida. Existem duas chaves, uma para chefes (boss) e uma para funcionários (worker). Peça a sua para quem administra a API.
+Toda chamada precisa do header `X-API-Key` com uma chave válida. Existem duas chaves fixas, uma para chefes (boss) e uma para funcionários (worker); peça a sua para quem administra a API. Além delas, cada funcionário cadastrado por `POST /worker` recebe uma chave própria, que funciona como chave de worker.
 
 ```
 curl http://localhost:8000/task/1 -H "X-API-Key: SUA_CHAVE"

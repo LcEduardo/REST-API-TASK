@@ -159,7 +159,7 @@ Fluxo do TDD, para cada comportamento novo:
 
 ## Autorização (API keys)
 
-Toda requisição precisa do header `X-API-Key` com a chave de boss ou de worker (as duas ficam no `.env`). Sem chave válida, a API responde `401` antes mesmo de olhar a rota. Quem confere a chave é `src/Auth/ApiKeyAuth.php`, chamado no começo do roteamento em `index.php`.
+Toda requisição precisa do header `X-API-Key` com a chave de boss ou de worker (as duas ficam no `.env`). Sem chave válida, a API responde `401` antes mesmo de olhar a rota. Quem confere a chave é `src/Auth/ApiKeyAuth.php` (classe de apoio), chamado no começo do roteamento em `index.php`.
 
 Explicação completa do código, passo a passo com o exemplo `GET /task/{id}`: [docs/autorizacao-api-keys.md](docs/autorizacao-api-keys.md).
 

@@ -35,4 +35,30 @@ final class WorkerTest extends TestCase
             $row
         );
     }
+
+    public function testFindIdByApiKeyHashReturnsTheWorkerId(): void
+    {
+        $hash = hash('sha256', 'secret');
+
+        $stmt = $this->createMock(PDOStatement::class);
+        $stmt->expects($this->once())->method('execute')->with(['hash' => $hash])->willReturn(true);
+        $stmt->method('fetchColumn')->willReturn('7'); // PDO returns columns as strings
+
+        $pdo = $this->createStub(PDO::class);
+        $pdo->method('prepare')->willReturn($stmt);
+
+        $this->assertSame(7, (new Worker($pdo))->findIdByApiKeyHash($hash));
+    }
+
+    public function testFindIdByApiKeyHashReturnsNullWhenNotFound(): void
+    {
+        $stmt = $this->createStub(PDOStatement::class);
+        $stmt->method('execute')->willReturn(true);
+        $stmt->method('fetchColumn')->willReturn(false);
+
+        $pdo = $this->createStub(PDO::class);
+        $pdo->method('prepare')->willReturn($stmt);
+
+        $this->assertNull((new Worker($pdo))->findIdByApiKeyHash(hash('sha256', 'nope')));
+    }
 }
