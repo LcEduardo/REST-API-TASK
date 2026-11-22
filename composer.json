@@ -12,7 +12,10 @@
             "App\\Auth\\": "src/Auth/",
             "App\\Controller\\": "src/Controller/",
             "App\\Model\\": "src/Model/"
-        }
+        },
+        "files": [
+            "src/Helpers/http.php"
+        ]
     },
     "autoload-dev": {
         "psr-4": {

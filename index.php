@@ -22,38 +22,6 @@ $controllerTask = new ControllerTask($Task, $controllerWorker, $controllerBoss);
 
 header('Content-Type: application/json');
 
-function respond(int $status, $body): void {
-    http_response_code($status);
-    echo json_encode($body);
-}
-
-// Resposta de erro no mesmo formato que os controllers devolvem
-function error(int $status, string $message): array {
-    return ['status' => $status, 'body' => ['error' => $message]];
-}
-
-// id de /recurso/{id}, ou null se não foi enviado
-function routeId(array $segments): ?string {
-    $id = $segments[1] ?? null;
-    return ($id === null || $id === '') ? null : $id;
-}
-
-// Só chama $next se o id foi enviado; senão responde 400
-function requireId(?string $id, callable $next): array {
-    return $id === null ? error(400, 'ID not provided') : $next($id);
-}
-
-// Lê o corpo JSON e passa para $next. Se for inválido (ou não for um objeto), responde 400.
-function withJsonBody(callable $next): array {
-    $body = json_decode(file_get_contents('php://input'), true);
-
-    if (json_last_error() !== JSON_ERROR_NONE || !is_array($body)) {
-        return error(400, 'Invalid JSON body');
-    }
-
-    return $next($body);
-}
-
 // Key sent in the X-API-Key header -> role ('boss' or 'worker').
 // Calculated before the route table so the handlers can check the role.
 $auth = new ApiKeyAuth([
@@ -61,11 +29,6 @@ $auth = new ApiKeyAuth([
     'worker' => $_ENV['API_SECRET_KEY_WORKER'] ?? null,
 ]);
 $role = $auth->roleFor($_SERVER['HTTP_X_API_KEY'] ?? null);
-
-// Only calls $next if the caller has the required role; otherwise responds 403
-function requireRole(?string $role, string $required, callable $next): array {
-    return $role === $required ? $next() : error(403, 'Access Denied');
-}
 
 // recurso => [método => handler]. Cada handler recebe o id da URL (ou null) e devolve ['status', 'body'].
 $routes = [
