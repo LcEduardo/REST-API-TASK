@@ -39,60 +39,8 @@ try {
     $authFailed = true;
 }
 
-// recurso => [método => handler]. Cada handler recebe o id da URL (ou null) e devolve ['status', 'body'].
-$routes = [
-    // singular para operações em um registro (/task/{id}, POST /task); plural só para listagem (/tasks)
-    'task' => [
-        'GET'  => fn($id) => requireId($id, fn($id) => $controllerTask->getTask($id)),
-        'POST' => fn() => withJsonBody(fn($b) => $controllerTask->createTask(
-            $b['worker_id'] ?? null, $b['boss_id'] ?? null, $b['description'] ?? null, $b['title'] ?? null
-        )),
-    ],
-    'tasks' => [
-        'GET' => fn($id) => $id !== null
-            ? error(404, 'Route not found')
-            : $controllerTask->getAllTasks($_GET['page'] ?? null, $_GET['per_page'] ?? null),
-    ],
-    'worker' => [
-        'GET'  => fn($id) => requireId($id, fn($id) => $controllerWorker->getWorker($id)),
-        // only a boss can create workers (the response carries the new worker's API key)
-        'POST' => fn() => requireRole($role, 'boss', fn() => withJsonBody(
-            fn($b) => $controllerWorker->createWorker($b['name'] ?? null, $b['email'] ?? null)
-        )),
-        'PUT'  => fn($id) => requireId($id, fn($id) => withJsonBody(
-            fn($b) => $controllerWorker->updateWorker($id, $b['name'] ?? null, $b['email'] ?? null)
-        )),
-    ],
-    'boss' => [
-        'GET'  => fn($id) => requireId($id, fn($id) => $controllerBoss->getBoss($id)),
-        'POST' => fn() => withJsonBody(fn($b) => $controllerBoss->createBoss($b['name'] ?? null, $b['email'] ?? null)),
-        'PUT'  => fn($id) => requireId($id, fn($id) => withJsonBody(
-            fn($b) => $controllerBoss->updateBoss($id, $b['name'] ?? null, $b['email'] ?? null)
-        )),
-    ],
-];
+$routes   = (require __DIR__ . '/config/routes.php')($controllerTask, $controllerWorker, $controllerBoss, $role);
+$segments = parseSegments($_SERVER['SCRIPT_NAME'], $_SERVER['REQUEST_URI']);
+$response = dispatch($routes, $_SERVER['REQUEST_METHOD'], $segments, $role, $authFailed);
 
-$base = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'])), '/'); // "" na raiz, ou "/subpasta" se o index.php estiver em uma
-$path = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH); // /tasks/1
-$path = substr($path, strlen($base)); // /tasks/1
-$segments = explode('/', trim($path, '/'));  // ["tasks"] ou ["tasks", "1"]
-$resource = $segments[0]; // "tasks"
-$method = $_SERVER['REQUEST_METHOD'];
-
-if ($authFailed) {
-    $response = error(500, 'Database error');
-} elseif ($role === null) {
-    // sem chave ou chave inválida -> 401, antes de olhar a rota (não revela quais rotas existem)
-    $response = error(401, 'Invalid or missing API key');
-} elseif (!isset($routes[$resource])) {
-    // rota não existe -> 404 (erro do cliente, por isso não é 500)
-    $response = error(404, 'Route not found');
-} elseif (!isset($routes[$resource][$method])) {
-    // rota existe, mas o método não é suportado -> 405 (Allow gerado a partir da tabela de rotas)
-    header('Allow: ' . implode(', ', array_keys($routes[$resource])));
-    $response = error(405, 'Method not allowed');
-} else {
-    $response = $routes[$resource][$method](routeId($segments));
-}
-
-respond($response['status'], $response['body']);
+respond($response['status'], $response['body'], $response['headers'] ?? []);

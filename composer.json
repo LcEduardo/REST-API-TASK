@@ -14,7 +14,8 @@
             "App\\Model\\": "src/Model/"
         },
         "files": [
-            "src/Helpers/http.php"
+            "src/Helpers/http.php",
+            "src/Helpers/routing.php"
         ]
     },
     "autoload-dev": {

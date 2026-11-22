@@ -28,7 +28,7 @@ php -m
 
 ```
 .
-├── index.php                  # Ponto de entrada e roteador: lê a URL e chama o controller certo
+├── index.php                  # Ponto de entrada: monta as peças, confere a API key e chama o dispatch
 ├── composer.json              # Configuração do autoload PSR-4 e dependências (Phinx, phpdotenv)
 ├── .env.example               # Modelo das variáveis de ambiente (copie para .env)
 ├── .env                       # Suas credenciais do banco (NÃO vai para o git)
@@ -41,10 +41,14 @@ php -m
 │   ├── migrations/            # Migrations: cada arquivo é uma mudança no banco
 │   └── seeds/                 # Seeds: dados de exemplo
 ├── config/
-│   └── database.php           # Conexão com o banco via PDO
+│   ├── database.php           # Conexão com o banco via PDO
+│   └── routes.php             # Tabela de rotas: recurso => [método => função]
 └── src/
     ├── Auth/                  # namespace App\Auth
     │   └── ApiKeyAuth.php         # Diz se a chave do header X-API-Key é de boss, de worker ou inválida
+    ├── Helpers/               # Funções soltas, carregadas pelo "files" do composer.json
+    │   ├── http.php               # respond, error, routeId, requireId, requireRole, withJsonBody
+    │   └── routing.php            # parseSegments (URL -> pedaços) e dispatch (decide a resposta)
     ├── Controller/            # namespace App\Controller
     │   ├── ControllerBoss.php     # Monta a resposta de bosses (corpo + status HTTP)
     │   ├── ControllerTask.php     # Monta a resposta de tasks (corpo + status HTTP)
@@ -72,7 +76,9 @@ Para uma classe nova ser encontrada:
 - o arquivo deve declarar o namespace da pasta (`namespace App\Model;`);
 - classes nativas do PHP usadas dentro do namespace precisam de `use` (`use PDO;`, `use Exception;`).
 
-Se você mudar o mapeamento no `composer.json`, rode `composer dump-autoload`.
+As funções soltas de `src/Helpers/` não têm namespace nem classe, então o PSR-4 não as encontra. Elas ficam listadas em `autoload.files` no `composer.json` e são carregadas em toda requisição (e nos testes).
+
+Se você mudar o mapeamento ou a lista de `files` no `composer.json`, rode `composer dump-autoload`.
 
 ## Como rodar
 
@@ -153,13 +159,14 @@ Fluxo do TDD, para cada comportamento novo:
 
 ## Papel de cada camada
 
-- **Root (`index.php`)**: é a porta de entrada. Primeiro confere a API key (veja [Autorização](#autorização-api-keys)). Depois lê o método HTTP e a URL, separa em segmentos (`/task/1` → recurso `task`, id `1`) e encaminha para o controller certo. Também valida se o id foi informado e responde quando a rota não existe ou o método não é suportado. No fim, aplica o status HTTP e devolve o JSON.
+- **Root (`index.php`)**: é a porta de entrada, mas só junta as peças. Monta models e controllers, confere a API key (veja [Autorização](#autorização-api-keys)), carrega a tabela de rotas de `config/routes.php`, separa a URL em segmentos com `parseSegments` (`/task/1` → recurso `task`, id `1`) e pede ao `dispatch` a resposta (401, 404, 405 ou a rota). No fim, `respond` aplica o status HTTP e devolve o JSON.
+- **Helpers (`src/Helpers/`)** e **rotas (`config/routes.php`)**: funções pequenas que conferem id, papel e corpo JSON antes de chamar o controller, e a tabela que liga cada recurso e método ao controller certo. Explicação completa, passo a passo com `GET /task/{id}` e `POST /worker`: [docs/roteamento-e-helpers.md](docs/roteamento-e-helpers.md).
 - **Controller (`ControllerTask`, `ControllerWorker`)**: recebe o model pronto, chama a consulta e transforma o resultado em resposta (`status` + `body`). É quem trata as exceções vindas do model e decide o código HTTP (200, 404, 500).
 - **Model (`Task`, `Worker`)**: só conversa com o banco, usando *prepared statements*. Não sabe nada de HTTP: se não encontra o registro, lança uma exceção e deixa o controller decidir o que responder.
 
 ## Autorização (API keys)
 
-Toda requisição precisa do header `X-API-Key` com a chave de boss ou de worker (as duas ficam no `.env`). Sem chave válida, a API responde `401` antes mesmo de olhar a rota. Quem confere a chave é `src/Auth/ApiKeyAuth.php` (classe de apoio), chamado no começo do roteamento em `index.php`.
+Toda requisição precisa do header `X-API-Key` com a chave de boss ou de worker (as duas ficam no `.env`), ou com a chave própria gerada para um worker no `POST /worker`. Sem chave válida, a API responde `401` antes mesmo de olhar a rota. Quem confere a chave é `src/Auth/ApiKeyAuth.php` (classe de apoio), chamado no começo do roteamento em `index.php`.
 
 Explicação completa do código, passo a passo com o exemplo `GET /task/{id}`: [docs/autorizacao-api-keys.md](docs/autorizacao-api-keys.md).
 

@@ -1,8 +1,11 @@
 <?php
 
-// Sends the HTTP status code and the JSON-encoded body
-function respond(int $status, $body): void {
+// Sends the HTTP status code, the extra headers (name => value) and the JSON-encoded body
+function respond(int $status, $body, array $headers = []): void {
     http_response_code($status);
+    foreach ($headers as $name => $value) {
+        header("$name: $value");
+    }
     echo json_encode($body);
 }
 
