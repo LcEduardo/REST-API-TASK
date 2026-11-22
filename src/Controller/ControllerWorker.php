@@ -56,9 +56,17 @@ class ControllerWorker extends Controller
 
             $data = $this->validateFields($name, $email);
 
+            // 32 random bytes -> 64 hex characters, same format as the keys in .env
+            $apiKey = bin2hex(random_bytes(32));
+            // Only the hash is stored. The key is random and long, so a fast hash is enough
+            // (password_hash is for low-entropy passwords) and it can be looked up by index.
+            $data['api_key_hash'] = hash('sha256', $apiKey);
+
             $workerId = $this->worker->create($data);
 
             $worker = $this->worker->getById($workerId);
+            // The plain key is returned only here, once; it can't be recovered later
+            $worker['api_key'] = $apiKey;
 
         }catch(PDOException $e) {
             return $this->databaseError($e);

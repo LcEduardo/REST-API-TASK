@@ -52,13 +52,73 @@ final class ControllerWorkerTest extends TestCase
         $worker = $this->createMock(Worker::class);
         $worker->expects($this->once())
             ->method('create')
-            ->with(['name' => 'Ana', 'email' => 'ana@example.com'])
+            ->with($this->callback(fn (array $data) => $data['name'] === 'Ana' && $data['email'] === 'ana@example.com'))
             ->willReturn(7);
         $worker->method('getById')->willReturn(['id' => 7]);
 
         $response = (new ControllerWorker($worker))->createWorker('  Ana ', 'ANA@Example.com');
 
         $this->assertSame(201, $response['status']);
+    }
+
+    public function testCreateWorkerReturnsApiKeyAndStoresOnlyItsHash(): void
+    {
+        $saved = null;
+
+        $worker = $this->createMock(Worker::class);
+        $worker->expects($this->once())
+            ->method('create')
+            ->willReturnCallback(function (array $data) use (&$saved) {
+                $saved = $data;
+                return 7;
+            });
+        $worker->method('getById')->willReturn(['id' => 7, 'name' => 'Ana', 'email' => 'ana@example.com']);
+
+        $response = (new ControllerWorker($worker))->createWorker('Ana', 'ana@example.com');
+
+        $this->assertSame(201, $response['status']);
+        $this->assertMatchesRegularExpression('/^[0-9a-f]{64}$/', $response['body']['api_key']);
+
+        // the database gets the SHA-256 of the key, never the key itself
+        $this->assertSame(hash('sha256', $response['body']['api_key']), $saved['api_key_hash']);
+        $this->assertNotContains($response['body']['api_key'], $saved);
+        $this->assertArrayNotHasKey('api_key_hash', $response['body']);
+    }
+
+    public function testCreateWorkerGeneratesADifferentKeyEachTime(): void
+    {
+        $worker = $this->createStub(Worker::class);
+        $worker->method('create')->willReturn(7);
+        $worker->method('getById')->willReturn(['id' => 7]);
+
+        $controller = new ControllerWorker($worker);
+
+        $this->assertNotSame(
+            $controller->createWorker('Ana', 'ana@example.com')['body']['api_key'],
+            $controller->createWorker('Bia', 'bia@example.com')['body']['api_key']
+        );
+    }
+
+    public function testCreateWorkerDoesNotReturnApiKeyWhenValidationFails(): void
+    {
+        $worker = $this->createMock(Worker::class);
+        $worker->expects($this->never())->method('create');
+
+        $response = (new ControllerWorker($worker))->createWorker('', 'ana@example.com');
+
+        $this->assertSame(400, $response['status']);
+        $this->assertArrayNotHasKey('api_key', $response['body']);
+    }
+
+    public function testGetWorkerDoesNotReturnApiKey(): void
+    {
+        $worker = $this->createStub(Worker::class);
+        $worker->method('getById')->willReturn(['id' => 1, 'name' => 'Ana', 'email' => 'ana@example.com']);
+
+        $response = (new ControllerWorker($worker))->getWorker('1');
+
+        $this->assertSame(200, $response['status']);
+        $this->assertArrayNotHasKey('api_key', $response['body']);
     }
 
     public function testCreateWorkerReturns409WhenEmailAlreadyExists(): void
