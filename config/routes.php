@@ -1,5 +1,6 @@
 <?php
 
+use App\Controller\ControllerAuth;
 use App\Controller\ControllerBoss;
 use App\Controller\ControllerTask;
 use App\Controller\ControllerWorker;
@@ -7,12 +8,21 @@ use App\Controller\ControllerWorker;
 // Builds the route table: resource => [method => handler].
 // Each handler receives the id from the URL (or null) and returns ['status', 'body'].
 // $role is the caller's role, used by handlers that restrict access.
+// $authMethod is how the caller authenticated ('jwt' or 'api_key').
 return fn(
     ControllerTask $controllerTask,
     ControllerWorker $controllerWorker,
     ControllerBoss $controllerBoss,
-    ?string $role
+    ControllerAuth $controllerAuth,
+    ?string $role,
+    ?string $authMethod
 ): array => [
+    // Exchanges the API key sent in X-API-Key for a JWT
+    'token' => [
+        'POST' => fn($id) => $id !== null
+            ? error(404, 'Route not found')
+            : $controllerAuth->createToken($role, $authMethod),
+    ],
     // Singular for operations on one record (/task/{id}, POST /task); plural only for listing (/tasks)
     'task' => [
         'GET'  => fn($id) => requireId($id, fn($id) => $controllerTask->getTask($id)),

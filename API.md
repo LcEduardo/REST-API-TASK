@@ -9,12 +9,13 @@ Este guia é para quem vai **consumir** a API (um front-end, um app, um parceiro
 | **URL base** | `http://localhost:8000` (ambiente local; troque pelo endereço do servidor onde a API estiver publicada) |
 | **Formato das respostas** | JSON (`Content-Type: application/json`) |
 | **Formato do envio (POST e PUT)** | JSON (`Content-Type: application/json`). Form (`x-www-form-urlencoded` / `multipart/form-data`) não é aceito. |
-| **Autenticação** | API key no header `X-API-Key` (veja [Autenticação](#autenticação)) |
+| **Autenticação** | API key no header `X-API-Key` ou JWT no header `Authorization: Bearer` (veja [Autenticação](#autenticação)) |
 
 ### Endpoints
 
 | Método | Rota | O que faz |
 |---|---|---|
+| `POST` | `/token` | Troca a API key por um JWT (veja [Usando JWT](#usando-jwt)) |
 | `GET` | `/tasks` | Lista as tasks, com paginação |
 | `GET` | `/task/{id}` | Busca uma task pelo id |
 | `POST` | `/task` | Cria uma task |
@@ -38,6 +39,29 @@ curl http://localhost:8000/task/1 -H "X-API-Key: SUA_CHAVE"
 Sem o header, com ele vazio ou com uma chave errada, a resposta é `401 {"error": "Invalid or missing API key"}`. Isso vale para qualquer rota, inclusive as que não existem: sem chave válida você recebe `401`, não `404`.
 
 Por enquanto as duas chaves podem acessar quase todas as rotas. A exceção é `POST /worker`, que só a chave de boss pode chamar: com a chave de worker a resposta é `403 {"error": "Access Denied"}`. Em breve, a chave de worker também não vai poder criar tasks nem editar registros (`POST` e `PUT`).
+
+#### Usando JWT
+
+Em vez de mandar a API key em toda chamada, você pode trocá-la por um token JWT com validade curta (1 hora por padrão):
+
+```
+curl -X POST http://localhost:8000/token -H "X-API-Key: SUA_CHAVE"
+```
+
+```json
+{ "token": "eyJhbGciOiJIUzI1NiIs...", "token_type": "Bearer", "expires_in": 3600 }
+```
+
+`expires_in` é a validade em segundos. Depois, mande o token no header `Authorization` no lugar do `X-API-Key`. O token tem o mesmo papel (boss ou worker) da chave que o gerou:
+
+```
+curl http://localhost:8000/task/1 -H "Authorization: Bearer SEU_TOKEN"
+```
+
+- Token vencido, alterado ou inválido: `401 {"error": "Invalid or missing API key"}`. Gere outro com a API key.
+- Se o header `Authorization` for enviado, ele precisa ser válido: a API **não** tenta o `X-API-Key` como alternativa.
+- Um token não gera outro: `POST /token` com `Authorization: Bearer` responde `403 {"error": "A token can only be issued with an API key"}`.
+- Se o servidor não tiver `JWT_SECRET` configurado, `POST /token` responde `500 {"error": "JWT authentication is not configured"}`.
 
 Os exemplos de `curl` abaixo omitem o header para ficarem mais curtos. Adicione `-H "X-API-Key: SUA_CHAVE"` em todos.
 

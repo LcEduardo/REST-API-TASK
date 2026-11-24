@@ -2,7 +2,7 @@ Each bug found should have a regression test created that fails, to ensure that 
 
 ## Commits
 
-If it's a simple fix, use the main branch. If not, create a new branch.
+If it's a simple fix, use the main branch. If not, create a new branch. Never commit without my approval. If you are unsure, ask me first.
 
 ## Comments
 

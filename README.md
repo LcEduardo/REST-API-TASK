@@ -96,7 +96,7 @@ Se você mudar o mapeamento ou a lista de `files` no `composer.json`, rode `comp
 
    O `.env` está no `.gitignore`: a senha nunca vai para o repositório. Em produção, você pode definir as variáveis (`DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASS`) direto no servidor em vez de usar o arquivo. Se faltar alguma, a API responde 500 e o Phinx mostra qual variável está faltando.
 
-   Preencha também as API keys (`API_SECRET_KEY_BOSS` e `API_SECRET_KEY_WORKER`). Gere cada uma com `php -r "echo bin2hex(random_bytes(32));"`. Se uma delas ficar vazia, ninguém consegue entrar com ela: toda chamada responde 401.
+   Preencha também as API keys (`API_SECRET_KEY_BOSS` e `API_SECRET_KEY_WORKER`). Gere cada uma com `php -r "echo bin2hex(random_bytes(32));"`. Se uma delas ficar vazia, ninguém consegue entrar com ela: toda chamada responde 401. Para usar JWT (`POST /token`), preencha `JWT_SECRET` (mínimo 32 bytes, gerado do mesmo jeito) e, se quiser, `JWT_TTL` (validade em segundos, padrão 3600).
 3. Crie as tabelas e insira os dados de exemplo:
 
    ```
