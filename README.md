@@ -3,6 +3,8 @@
 API simples em PHP puro com PostgreSQL para consultar tarefas (`tasks`) e funcionários (`workers`).
 
 > Vai consumir a API? Veja o [Guia de uso da API](API.md), com as rotas, os campos e os erros.
+>
+> Swagger: a especificação OpenAPI fica em [docs/openapi.json](docs/openapi.json). Com o servidor rodando (`php -S localhost:8000`), abra `http://localhost:8000/docs/swagger.html`, clique em **Authorize** e informe sua `X-API-Key` para testar as rotas pelo navegador. O teste `tests/Unit/Docs/OpenApiTest.php` falha se uma rota de `config/routes.php` não estiver documentada na especificação.
 
 ## Requisitos
 

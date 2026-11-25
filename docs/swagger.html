@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Task API - Swagger UI</title>
+    <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css">
+</head>
+<body>
+    <div id="swagger-ui"></div>
+    <script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
+    <script>
+        // Loads the spec next to this page; "Authorize" sets the X-API-Key header for "Try it out"
+        window.ui = SwaggerUIBundle({
+            url: 'openapi.json',
+            dom_id: '#swagger-ui',
+            persistAuthorization: true,
+        });
+    </script>
+</body>
+</html>
