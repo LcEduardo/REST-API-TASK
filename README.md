@@ -3,6 +3,8 @@
 API simples em PHP puro com PostgreSQL para consultar tarefas (`tasks`) e funcionários (`workers`).
 
 > Vai consumir a API? Veja o [Guia de uso da API](API.md), com as rotas, os campos e os erros.
+>
+> Prefere testar pelo navegador? Com o servidor rodando, abra o Swagger em `http://localhost:8000/swagger/index.html` e clique em **Authorize** para informar a `X-API-Key`. A spec fica em [`swagger/openapi.json`](swagger/openapi.json).
 
 ## Requisitos
 

@@ -1,0 +1,433 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "API de Tasks",
+    "version": "1.0.0",
+    "description": "API em PHP puro com PostgreSQL para gerenciar tasks, funcionários (workers) e chefes (bosses).\n\n**Autenticação:** toda chamada precisa do header `X-API-Key`. Sem chave válida a resposta é `401`, inclusive em rotas que não existem. Só a chave de boss pode chamar `POST /worker`.\n\n**Corpo (POST e PUT):** sempre JSON (`Content-Type: application/json`). Form não é aceito. Ids podem ir como número ou texto (`1` ou `\"1\"`).\n\nGuia completo em `API.md`."
+  },
+  "servers": [
+    { "url": "http://localhost:8000", "description": "Ambiente local (php -S localhost:8000)" }
+  ],
+  "security": [
+    { "ApiKeyAuth": [] }
+  ],
+  "tags": [
+    { "name": "Tasks" },
+    { "name": "Workers", "description": "Funcionários" },
+    { "name": "Bosses", "description": "Chefes" }
+  ],
+  "paths": {
+    "/tasks": {
+      "get": {
+        "tags": ["Tasks"],
+        "summary": "Lista as tasks (paginado)",
+        "description": "Devolve as tasks ordenadas por `id`. Uma página depois da última devolve `200` com `data: []`.\n`/tasks/{id}` devolve `404`; para buscar uma task use `/task/{id}`.",
+        "operationId": "listTasks",
+        "parameters": [
+          { "name": "page", "in": "query", "required": false, "schema": { "type": "integer", "minimum": 1, "maximum": 2147483647, "default": 1 } },
+          { "name": "per_page", "in": "query", "required": false, "schema": { "type": "integer", "minimum": 1, "maximum": 100, "default": 20 } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Página de tasks",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/TaskPage" } } }
+          },
+          "400": {
+            "description": "`page` ou `per_page` inválido",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" },
+                "examples": {
+                  "page": { "value": { "error": "The page must be a positive integer" } },
+                  "perPage": { "value": { "error": "The per_page must be an integer between 1 and 100" } }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "405": { "$ref": "#/components/responses/MethodNotAllowed" },
+          "500": { "$ref": "#/components/responses/DatabaseError" }
+        }
+      }
+    },
+    "/task": {
+      "post": {
+        "tags": ["Tasks"],
+        "summary": "Cria uma task",
+        "description": "Toda task nova começa com status `pending`. Os campos são validados nesta ordem: `boss_id`, `worker_id`, depois `title`/`description`; só o primeiro erro é devolvido. Espaços no começo e no fim de `title` são removidos.",
+        "operationId": "createTask",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/TaskInput" },
+              "examples": {
+                "comFuncionario": {
+                  "summary": "Com funcionário",
+                  "value": { "title": "Revisar contrato", "description": "Conferir as cláusulas novas", "boss_id": 1, "worker_id": 2 }
+                },
+                "semFuncionario": {
+                  "summary": "Sem funcionário",
+                  "value": { "title": "Planejar sprint", "boss_id": 1 }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Task criada",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Task" } } }
+          },
+          "400": {
+            "description": "Corpo inválido",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" },
+                "examples": {
+                  "invalidJson": { "value": { "error": "Invalid JSON body" } },
+                  "bossId": { "value": { "error": "The boss_id isn't interger" } },
+                  "workerId": { "value": { "error": "The worker_id isn't interger" } },
+                  "titleRequired": { "value": { "error": "The title is required" } },
+                  "notStrings": { "value": { "error": "The title and description must be strings" } }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": {
+            "description": "Chefe ou funcionário não encontrado",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" },
+                "examples": {
+                  "boss": { "value": { "error": "Boss with id 99 not found" } },
+                  "worker": { "value": { "error": "Worker with id 99 not found" } }
+                }
+              }
+            }
+          },
+          "405": { "$ref": "#/components/responses/MethodNotAllowed" },
+          "500": { "$ref": "#/components/responses/DatabaseError" }
+        }
+      }
+    },
+    "/task/{id}": {
+      "parameters": [
+        { "$ref": "#/components/parameters/Id" }
+      ],
+      "get": {
+        "tags": ["Tasks"],
+        "summary": "Busca uma task pelo id",
+        "operationId": "getTask",
+        "responses": {
+          "200": {
+            "description": "Task encontrada",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Task" } } }
+          },
+          "400": {
+            "description": "Id não é inteiro",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" }, "example": { "error": "The task id isn't integer" } } }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": {
+            "description": "Task não encontrada",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" }, "example": { "error": "Task with id 99 not found" } } }
+          },
+          "405": { "$ref": "#/components/responses/MethodNotAllowed" },
+          "500": { "$ref": "#/components/responses/DatabaseError" }
+        }
+      }
+    },
+    "/worker": {
+      "post": {
+        "tags": ["Workers"],
+        "summary": "Cadastra um funcionário e gera a API key dele (só boss)",
+        "description": "Só a chave de **boss** pode chamar esta rota (o `403` é checado antes de ler o corpo).\nA `api_key` aparece **só nesta resposta**: a API guarda apenas o hash SHA-256 dela.\nO email é gravado em minúsculo e espaços nas pontas de `name`/`email` são removidos.",
+        "operationId": "createWorker",
+        "requestBody": { "$ref": "#/components/requestBodies/PersonInput" },
+        "responses": {
+          "201": {
+            "description": "Funcionário criado",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/WorkerWithApiKey" } } }
+          },
+          "400": { "$ref": "#/components/responses/PersonBadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": {
+            "description": "A chave enviada não é a de boss",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" }, "example": { "error": "Access Denied" } } }
+          },
+          "405": { "$ref": "#/components/responses/MethodNotAllowed" },
+          "409": { "$ref": "#/components/responses/EmailConflict" },
+          "500": { "$ref": "#/components/responses/DatabaseError" }
+        }
+      }
+    },
+    "/worker/{id}": {
+      "parameters": [
+        { "$ref": "#/components/parameters/Id" }
+      ],
+      "get": {
+        "tags": ["Workers"],
+        "summary": "Busca um funcionário pelo id",
+        "operationId": "getWorker",
+        "responses": {
+          "200": {
+            "description": "Funcionário encontrado",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Person" } } }
+          },
+          "400": {
+            "description": "Id não é inteiro",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" }, "example": { "error": "The worker_id isn't interger" } } }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": {
+            "description": "Funcionário não encontrado",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" }, "example": { "error": "Worker with id 99 not found" } } }
+          },
+          "405": { "$ref": "#/components/responses/MethodNotAllowed" },
+          "500": { "$ref": "#/components/responses/DatabaseError" }
+        }
+      },
+      "put": {
+        "tags": ["Workers"],
+        "summary": "Edita um funcionário",
+        "description": "Substitui os dados: envie sempre `name` e `email`. Mesmas regras do `POST /worker`.\nValidação na ordem id, `name`, `email` e só então se o funcionário existe.",
+        "operationId": "updateWorker",
+        "requestBody": { "$ref": "#/components/requestBodies/PersonInput" },
+        "responses": {
+          "200": {
+            "description": "Funcionário atualizado",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Person" } } }
+          },
+          "400": { "$ref": "#/components/responses/PersonBadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": {
+            "description": "Funcionário não encontrado",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" }, "example": { "error": "Worker with id 99 not found" } } }
+          },
+          "405": { "$ref": "#/components/responses/MethodNotAllowed" },
+          "409": { "$ref": "#/components/responses/EmailConflict" },
+          "500": { "$ref": "#/components/responses/DatabaseError" }
+        }
+      }
+    },
+    "/boss": {
+      "post": {
+        "tags": ["Bosses"],
+        "summary": "Cadastra um chefe",
+        "description": "Mesmas regras do `POST /worker`, mas sem API key e sem restrição de papel. Emails de chefes e funcionários são independentes.",
+        "operationId": "createBoss",
+        "requestBody": { "$ref": "#/components/requestBodies/PersonInput" },
+        "responses": {
+          "201": {
+            "description": "Chefe criado",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Person" } } }
+          },
+          "400": { "$ref": "#/components/responses/PersonBadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "405": { "$ref": "#/components/responses/MethodNotAllowed" },
+          "409": { "$ref": "#/components/responses/EmailConflict" },
+          "500": { "$ref": "#/components/responses/DatabaseError" }
+        }
+      }
+    },
+    "/boss/{id}": {
+      "parameters": [
+        { "$ref": "#/components/parameters/Id" }
+      ],
+      "get": {
+        "tags": ["Bosses"],
+        "summary": "Busca um chefe pelo id",
+        "operationId": "getBoss",
+        "responses": {
+          "200": {
+            "description": "Chefe encontrado",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Person" } } }
+          },
+          "400": {
+            "description": "Id não é inteiro",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" }, "example": { "error": "The boss_id isn't interger" } } }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": {
+            "description": "Chefe não encontrado",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" }, "example": { "error": "Boss with id 99 not found" } } }
+          },
+          "405": { "$ref": "#/components/responses/MethodNotAllowed" },
+          "500": { "$ref": "#/components/responses/DatabaseError" }
+        }
+      },
+      "put": {
+        "tags": ["Bosses"],
+        "summary": "Edita um chefe",
+        "description": "Substitui os dados. Envie sempre `name` e `email`; mesmas regras do `PUT /worker/{id}`.",
+        "operationId": "updateBoss",
+        "requestBody": { "$ref": "#/components/requestBodies/PersonInput" },
+        "responses": {
+          "200": {
+            "description": "Chefe atualizado",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Person" } } }
+          },
+          "400": { "$ref": "#/components/responses/PersonBadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": {
+            "description": "Chefe não encontrado",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" }, "example": { "error": "Boss with id 99 not found" } } }
+          },
+          "405": { "$ref": "#/components/responses/MethodNotAllowed" },
+          "409": { "$ref": "#/components/responses/EmailConflict" },
+          "500": { "$ref": "#/components/responses/DatabaseError" }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "ApiKeyAuth": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-API-Key",
+        "description": "Chave de boss, de worker (ambas no `.env`) ou a chave própria gerada no `POST /worker`."
+      }
+    },
+    "parameters": {
+      "Id": {
+        "name": "id",
+        "in": "path",
+        "required": true,
+        "description": "Id do registro (inteiro)",
+        "schema": { "type": "integer", "minimum": 1, "maximum": 2147483647 }
+      }
+    },
+    "requestBodies": {
+      "PersonInput": {
+        "required": true,
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/PersonInput" },
+            "example": { "name": "Maria Oliveira", "email": "maria.oliveira@example.com" }
+          }
+        }
+      }
+    },
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "required": ["error"],
+        "properties": {
+          "error": { "type": "string", "example": "Mensagem explicando o problema" }
+        }
+      },
+      "Task": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer", "example": 1 },
+          "title": { "type": "string", "maxLength": 150, "example": "Create login page" },
+          "description": { "type": "string", "nullable": true, "example": "Build the login form with validation." },
+          "status": { "type": "string", "enum": ["pending", "in_progress", "done"], "example": "pending" },
+          "created": { "type": "string", "description": "Data e hora (formato do Postgres)", "example": "2026-10-29 14:05:12.481203" },
+          "modified": { "type": "string", "description": "Data e hora (formato do Postgres)", "example": "2026-10-29 14:05:12.481203" },
+          "worker": { "type": "string", "nullable": true, "description": "**Nome** do funcionário responsável", "example": "Ana Silva" },
+          "boss": { "type": "string", "nullable": true, "description": "**Nome** do chefe que criou a task", "example": "Fernando Alves" }
+        }
+      },
+      "TaskPage": {
+        "type": "object",
+        "properties": {
+          "data": { "type": "array", "items": { "$ref": "#/components/schemas/Task" } },
+          "page": { "type": "integer", "example": 1 },
+          "per_page": { "type": "integer", "example": 20 },
+          "total": { "type": "integer", "description": "Total de tasks", "example": 8 }
+        }
+      },
+      "TaskInput": {
+        "type": "object",
+        "required": ["title", "boss_id"],
+        "properties": {
+          "title": { "type": "string", "maxLength": 150, "description": "Obrigatório; não pode ser vazio nem só espaços" },
+          "description": { "type": "string", "nullable": true },
+          "boss_id": {
+            "oneOf": [{ "type": "integer" }, { "type": "string" }],
+            "description": "Id do chefe (número ou texto numérico)"
+          },
+          "worker_id": {
+            "oneOf": [{ "type": "integer" }, { "type": "string" }],
+            "nullable": true,
+            "description": "Id do funcionário. Omitido ou vazio = task sem responsável"
+          }
+        }
+      },
+      "Person": {
+        "type": "object",
+        "description": "Funcionário ou chefe",
+        "properties": {
+          "id": { "type": "integer", "example": 1 },
+          "name": { "type": "string", "maxLength": 100, "example": "Ana Silva" },
+          "email": { "type": "string", "format": "email", "maxLength": 150, "example": "ana.silva@example.com" },
+          "created": { "type": "string", "example": "2026-10-29 14:05:12.481203" }
+        }
+      },
+      "WorkerWithApiKey": {
+        "allOf": [
+          { "$ref": "#/components/schemas/Person" },
+          {
+            "type": "object",
+            "properties": {
+              "api_key": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$",
+                "description": "Aparece só nesta resposta; não pode ser consultada depois"
+              }
+            }
+          }
+        ]
+      },
+      "PersonInput": {
+        "type": "object",
+        "required": ["name", "email"],
+        "properties": {
+          "name": { "type": "string", "minLength": 1, "maxLength": 100 },
+          "email": { "type": "string", "format": "email", "maxLength": 150 }
+        }
+      }
+    },
+    "responses": {
+      "Unauthorized": {
+        "description": "Header `X-API-Key` ausente, vazio ou inválido",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" }, "example": { "error": "Invalid or missing API key" } } }
+      },
+      "MethodNotAllowed": {
+        "description": "Método não suportado na rota. O header `Allow` lista os métodos aceitos",
+        "headers": {
+          "Allow": { "schema": { "type": "string", "example": "GET, POST" } }
+        },
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" }, "example": { "error": "Method not allowed" } } }
+      },
+      "DatabaseError": {
+        "description": "Falha no banco de dados",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" }, "example": { "error": "Database error" } } }
+      },
+      "EmailConflict": {
+        "description": "Email já cadastrado",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" }, "example": { "error": "Email already registered" } } }
+      },
+      "PersonBadRequest": {
+        "description": "Id, corpo, `name` ou `email` inválido",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/Error" },
+            "examples": {
+              "invalidJson": { "value": { "error": "Invalid JSON body" } },
+              "nameRequired": { "value": { "error": "The name is required" } },
+              "nameTooLong": { "value": { "error": "The name must have at most 100 characters" } },
+              "emailInvalid": { "value": { "error": "The email isn't valid" } },
+              "emailTooLong": { "value": { "error": "The email must have at most 150 characters" } },
+              "notStrings": { "value": { "error": "The name and email must be strings" } }
+            }
+          }
+        }
+      }
+    }
+  }
+}
